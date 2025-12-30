@@ -1,0 +1,37 @@
+# RepoFlow GitHub OAuth Token Exchange Worker
+# 
+# 部署步骤：
+# 1. npm install -g wrangler
+# 2. wrangler login
+# 3. wrangler kv:namespace create RATE_LIMITER
+# 4. 将上一步输出的 id 填入下方 kv_namespaces 配置
+# 5. wrangler secret put GITHUB_CLIENT_ID
+# 6. wrangler secret put GITHUB_CLIENT_SECRET
+# 7. wrangler deploy
+
+name = "repoflow-oauth"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
+# KV 命名空间（用于速率限制）
+# 运行 `wrangler kv:namespace create RATE_LIMITER` 后填入 id
+# kv_namespaces = [
+#   { binding = "RATE_LIMITER", id = "YOUR_KV_NAMESPACE_ID" }
+# ]
+
+# 可选：设置自定义域名后取消注释
+# routes = [
+#   { pattern = "oauth.your-domain.com", custom_domain = true }
+# ]
+
+# 环境变量（非敏感信息可以放这里，敏感信息用 wrangler secret）
+[vars]
+# ALLOWED_ORIGINS = "https://your-app.com"
+
+# 生产环境配置
+[env.production]
+name = "repoflow-oauth"
+# routes = [{ pattern = "oauth.your-domain.com", custom_domain = true }]
+# kv_namespaces = [
+#   { binding = "RATE_LIMITER", id = "YOUR_PRODUCTION_KV_NAMESPACE_ID" }
+# ]

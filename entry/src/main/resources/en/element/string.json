@@ -1,0 +1,25 @@
+{
+  "string": [
+    { "name": "module_desc", "value": "module description" },
+    { "name": "EntryAbility_desc", "value": "description" },
+    { "name": "EntryAbility_label", "value": "label" },
+    { "name": "tab_home", "value": "Home" },
+    { "name": "tab_repos", "value": "Repos" },
+    { "name": "tab_notifications", "value": "Notifications" },
+    { "name": "tab_settings", "value": "Settings" },
+    { "name": "home_title", "value": "RepoFlow" },
+    { "name": "home_subtitle", "value": "Third-party GitHub client · power users" },
+    { "name": "home_progress", "value": "Status: OAuth callback, network layer, and nav skeleton are in place." },
+    { "name": "repos_title", "value": "Repositories (API wiring pending)" },
+    { "name": "repos_desc", "value": "Planned: search / list / README / tree / branches & releases." },
+    { "name": "notif_title", "value": "Notifications (read-only skeleton)" },
+    { "name": "notif_desc", "value": "Planned: polling/ETag delta, read/unread, filter by repo/type." },
+    { "name": "settings_title", "value": "Settings & Compliance" },
+    { "name": "settings_callback_label", "value": "Callback URI" },
+    { "name": "settings_token_label", "value": "Token status" },
+    { "name": "settings_token_logged_in", "value": "Stored (hidden)" },
+    { "name": "settings_token_logged_out", "value": "Not signed in" },
+    { "name": "settings_hint", "value": "Tip: use secure storage, offer clear and re-auth in production." },
+    { "name": "settings_callback_value", "value": "repoflow.autyan.app://auth/callback" }
+  ]
+}

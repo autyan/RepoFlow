@@ -2,15 +2,47 @@
   "string": [
     {
       "name": "module_desc",
-      "value": "module description"
+      "value": "RepoFlow - GitHub 客户端"
     },
     {
       "name": "EntryAbility_desc",
-      "value": "description"
+      "value": "RepoFlow GitHub 客户端"
     },
     {
       "name": "EntryAbility_label",
-      "value": "label"
-    }
+      "value": "源流"
+    },
+    { "name": "tab_home", "value": "首页" },
+    { "name": "tab_repos", "value": "仓库" },
+    { "name": "tab_notifications", "value": "通知" },
+    { "name": "tab_profile", "value": "我的" },
+    { "name": "home_title", "value": "源流" },
+    { "name": "home_subtitle", "value": "第三方 GitHub 客户端 · 重度使用场景" },
+    { "name": "home_progress", "value": "当前进度：OAuth 回调注册、网络层与导航骨架已建立。" },
+    { "name": "home_welcome", "value": "欢迎回来" },
+    { "name": "home_guest", "value": "访客" },
+    { "name": "repos_title", "value": "仓库列表（待接入 GitHub API）" },
+    { "name": "repos_desc", "value": "规划：搜索 / 列表 / README / 文件树 / 分支与 Release 查看。" },
+    { "name": "repos_login_hint", "value": "登录后查看您的仓库" },
+    { "name": "notif_title", "value": "通知（只读骨架）" },
+    { "name": "notif_desc", "value": "规划：轮询/ETag 增量、已读/未读标记、按仓库/类型过滤。" },
+    { "name": "notif_login_hint", "value": "登录后查看通知" },
+    { "name": "settings_title", "value": "个人资料" },
+    { "name": "settings_callback_label", "value": "回调 URI" },
+    { "name": "settings_token_label", "value": "Token 状态" },
+    { "name": "settings_token_logged_in", "value": "已存储 (隐去)" },
+    { "name": "settings_token_logged_out", "value": "未登录" },
+    { "name": "settings_hint", "value": "提示：生产环境请使用安全存储，并提供一键清除与重新授权。" },
+    { "name": "settings_callback_value", "value": "repoflow.autyan.app://auth/callback" },
+    { "name": "btn_login", "value": "使用 GitHub 登录" },
+    { "name": "btn_logout", "value": "退出登录" },
+    { "name": "btn_view_profile", "value": "查看个人主页" },
+    { "name": "profile_title", "value": "个人主页" },
+    { "name": "profile_repos", "value": "公开仓库" },
+    { "name": "profile_followers", "value": "关注者" },
+    { "name": "profile_following", "value": "正在关注" },
+    { "name": "loading", "value": "加载中..." },
+    { "name": "login_success", "value": "登录成功" },
+    { "name": "login_failed", "value": "登录失败" }
   ]
 }

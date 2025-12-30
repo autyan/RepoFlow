@@ -11,3 +11,11 @@
 **/.test
 /.appanalyzer
 /docs/
+/local-config/
+
+# Workers 项目
+**/workers/**/node_modules
+**/workers/**/.wrangler
+
+# 本地敏感配置（OAuth secrets 等）
+**/config/local.config.ets

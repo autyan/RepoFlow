@@ -1,5 +1,20 @@
 {
   "src": [
-    "pages/Index"
+    "pages/SplashPage",
+    "pages/Index",
+    "pages/LoginPage",
+    "pages/RepoDetailPage",
+    "pages/SettingsPage",
+    "pages/OpenSourcePage",
+    "pages/TermsPage",
+    "pages/PrivacyPage",
+    "pages/FollowListPage",
+    "pages/StarredReposPage",
+    "pages/UserProfilePage",
+    "pages/CodeBrowserPage",
+    "pages/FileViewerPage",
+    "pages/IssuesPage",
+    "pages/IssueDetailPage",
+    "pages/CreateIssuePage"
   ]
 }

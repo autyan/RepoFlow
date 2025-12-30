@@ -1,6 +1,20 @@
 {
   "app": {
-    "signingConfigs": [],
+    "signingConfigs": [
+      {
+        "name": "default",
+        "type": "HarmonyOS",
+        "material": {
+          "certpath": "C:\\Users\\autyan\\.ohos\\config\\default_RepoFlow_y4yb54uag_9bFPSPMvqGCnOCHHNpc1uz0cUcf6DP5Kc=.cer",
+          "keyAlias": "debugKey",
+          "keyPassword": "0000001AE23E499951FDD5EA3DE1875552CD8DDC4EC53A3B91A4D27119D475B39DCEE64DD9025F5C1BEB",
+          "profile": "C:\\Users\\autyan\\.ohos\\config\\default_RepoFlow_y4yb54uag_9bFPSPMvqGCnOCHHNpc1uz0cUcf6DP5Kc=.p7b",
+          "signAlg": "SHA256withECDSA",
+          "storeFile": "C:\\Users\\autyan\\.ohos\\config\\default_RepoFlow_y4yb54uag_9bFPSPMvqGCnOCHHNpc1uz0cUcf6DP5Kc=.p12",
+          "storePassword": "0000001A3237192AB15468E2119D799A21EBA9CDF37026A24D6EA39BE6F34F247A33EDCB828ECC1FB2DA"
+        }
+      }
+    ],
     "products": [
       {
         "name": "default",
