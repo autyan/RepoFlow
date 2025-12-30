@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="RepoFlow branch and nodes">
+  <g fill="none" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round" stroke-width="64">
+    <circle cx="288" cy="256" r="80" fill="#FFFFFF"/>
+    <circle cx="736" cy="352" r="80" fill="#FFFFFF"/>
+    <circle cx="512" cy="704" r="80" fill="#FFFFFF"/>
+    <path d="M288 336v224c0 80 64 144 144 144h32"/>
+    <path d="M464 320c32 32 80 64 144 64h48"/>
+    <path d="M656 432c0 80-64 144-144 144h-32"/>
+  </g>
+</svg>
