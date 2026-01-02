@@ -2,34 +2,41 @@ import router from '@ohos.router';
 import { authManager } from '../services/AuthManager';
 import { userState } from '../common/state/UserState';
 import promptAction from '@ohos.promptAction';
-
-const PRIMARY_TEXT = '#1F2328';
-const SECONDARY_TEXT = '#656D76';
-const CARD_BG = '#F6F8FA';
-const ACCENT = '#0969DA';
-const DANGER = '#CF222E';
-const ICON_COLOR = '#57606A';
+import { ThemeManager, ThemeMode, ThemeColors } from '../theme';
+import { Spacing, BorderRadius, FontSize } from '../theme/DesignTokens';
 
 @Entry
 @Component
 struct SettingsPage {
   @State isLoggedIn: boolean = false;
+  @State themeMode: ThemeMode = ThemeMode.SYSTEM;
+  @State isDarkTheme: boolean = false;
+  private colors: ThemeColors = ThemeManager.colors;
 
   aboutToAppear(): void {
     this.isLoggedIn = userState.isLoggedIn;
+    this.themeMode = ThemeManager.currentMode;
+    this.isDarkTheme = ThemeManager.isDark;
+
     userState.addListener(() => {
       this.isLoggedIn = userState.isLoggedIn;
+    });
+
+    // 订阅主题变化
+    ThemeManager.subscribe((colors: ThemeColors, isDark: boolean) => {
+      this.isDarkTheme = isDark;
+      this.colors = colors;
     });
   }
 
   async handleLogout(): Promise<void> {
     try {
       const result = await promptAction.showDialog({
-        title: '退出登录',
-        message: '确定要退出登录吗？退出后需要重新授权才能使用完整功能。',
+        title: $r('app.string.logout'),
+        message: $r('app.string.logout_confirm'),
         buttons: [
-          { text: '取消', color: SECONDARY_TEXT },
-          { text: '退出', color: DANGER }
+          { text: $r('app.string.cancel'), color: this.colors.textSecondary as string },
+          { text: $r('app.string.logout'), color: this.colors.error as string }
         ]
       });
 
@@ -42,6 +49,39 @@ struct SettingsPage {
     }
   }
 
+  async handleThemeChange(): Promise<void> {
+    try {
+      const result = await promptAction.showActionMenu({
+        title: $r('app.string.theme_mode'),
+        buttons: [
+          { text: $r('app.string.theme_system'), color: this.colors.textPrimary as string },
+          { text: $r('app.string.theme_light'), color: this.colors.textPrimary as string },
+          { text: $r('app.string.theme_dark'), color: this.colors.textPrimary as string }
+        ]
+      });
+
+      const modes: ThemeMode[] = [ThemeMode.SYSTEM, ThemeMode.LIGHT, ThemeMode.DARK];
+      if (result.index >= 0 && result.index < modes.length) {
+        await ThemeManager.setThemeMode(modes[result.index]);
+        this.themeMode = modes[result.index];
+        this.colors = ThemeManager.colors;
+      }
+    } catch (error) {
+      console.error('Theme change failed:', JSON.stringify(error));
+    }
+  }
+
+  private getThemeModeText(): Resource {
+    switch (this.themeMode) {
+      case ThemeMode.LIGHT:
+        return $r('app.string.theme_light');
+      case ThemeMode.DARK:
+        return $r('app.string.theme_dark');
+      default:
+        return $r('app.string.theme_system');
+    }
+  }
+
   build() {
     Column() {
       // 顶部导航栏
@@ -50,7 +90,7 @@ struct SettingsPage {
           Image($r('app.media.ic_back'))
             .width(24)
             .height(24)
-            .fillColor(PRIMARY_TEXT)
+            .fillColor(this.colors.textPrimary)
         }
         .width(40)
         .height(40)
@@ -59,10 +99,10 @@ struct SettingsPage {
           router.back();
         })
 
-        Text('设置')
-          .fontSize(18)
+        Text($r('app.string.settings'))
+          .fontSize(FontSize.SUBTITLE)
           .fontWeight(FontWeight.Medium)
-          .fontColor(PRIMARY_TEXT)
+          .fontColor(this.colors.textPrimary)
           .layoutWeight(1)
           .textAlign(TextAlign.Center)
 
@@ -71,188 +111,225 @@ struct SettingsPage {
       }
       .width('100%')
       .height(56)
-      .padding({ left: 8, right: 8 })
-      .backgroundColor('#FFFFFF')
+      .padding({ left: Spacing.XS, right: Spacing.XS })
+      .backgroundColor(this.colors.surface)
 
       Scroll() {
-        Column({ space: 16 }) {
+        Column({ space: Spacing.MD }) {
+          // 外观设置
+          Column({ space: 0 }) {
+            Text($r('app.string.appearance'))
+              .fontSize(FontSize.CAPTION)
+              .fontColor(this.colors.textSecondary)
+              .width('100%')
+              .padding({ left: Spacing.MD, bottom: Spacing.XS })
+
+            Column() {
+              // 主题模式
+              Row() {
+                Text($r('app.string.theme_mode'))
+                  .fontSize(FontSize.BODY)
+                  .fontColor(this.colors.textPrimary)
+                Blank()
+                Text(this.getThemeModeText())
+                  .fontSize(FontSize.BODY)
+                  .fontColor(this.colors.textSecondary)
+                Image($r('app.media.ic_chevron_right'))
+                  .width(16)
+                  .height(16)
+                  .fillColor(this.colors.textTertiary)
+                  .margin({ left: Spacing.XXS })
+              }
+              .width('100%')
+              .height(52)
+              .padding({ left: Spacing.MD, right: Spacing.MD })
+              .onClick(() => {
+                this.handleThemeChange();
+              })
+            }
+            .width('100%')
+            .backgroundColor(this.colors.surfaceVariant)
+            .borderRadius(BorderRadius.MD)
+          }
+          .width('100%')
+
           // 关于应用
           Column({ space: 0 }) {
-            Text('关于')
-              .fontSize(13)
-              .fontColor(SECONDARY_TEXT)
+            Text($r('app.string.about'))
+              .fontSize(FontSize.CAPTION)
+              .fontColor(this.colors.textSecondary)
               .width('100%')
-              .padding({ left: 16, bottom: 8 })
+              .padding({ left: Spacing.MD, bottom: Spacing.XS })
 
             Column() {
               // 版本
               Row() {
-                Text('版本')
-                  .fontSize(15)
-                  .fontColor(PRIMARY_TEXT)
+                Text($r('app.string.version'))
+                  .fontSize(FontSize.BODY)
+                  .fontColor(this.colors.textPrimary)
                 Blank()
-                Text('1.0.0')
-                  .fontSize(15)
-                  .fontColor(SECONDARY_TEXT)
+                Text($r('app.string.app_version_value'))
+                  .fontSize(FontSize.BODY)
+                  .fontColor(this.colors.textSecondary)
               }
               .width('100%')
               .height(52)
-              .padding({ left: 16, right: 16 })
+              .padding({ left: Spacing.MD, right: Spacing.MD })
 
-              Divider().color('#E1E4E8').margin({ left: 16 })
+              Divider().color(this.colors.border).margin({ left: Spacing.MD })
 
               // 开发者
               Row() {
-                Text('开发者')
-                  .fontSize(15)
-                  .fontColor(PRIMARY_TEXT)
+                Text($r('app.string.developer'))
+                  .fontSize(FontSize.BODY)
+                  .fontColor(this.colors.textPrimary)
                 Blank()
-                Text("Misaka's fan")
-                  .fontSize(15)
-                  .fontColor(SECONDARY_TEXT)
+                Text($r('app.string.settings_author'))
+                  .fontSize(FontSize.BODY)
+                  .fontColor(this.colors.textSecondary)
               }
               .width('100%')
               .height(52)
-              .padding({ left: 16, right: 16 })
+              .padding({ left: Spacing.MD, right: Spacing.MD })
             }
             .width('100%')
-            .backgroundColor(CARD_BG)
-            .borderRadius(12)
+            .backgroundColor(this.colors.surfaceVariant)
+            .borderRadius(BorderRadius.MD)
           }
           .width('100%')
 
           // 法律条款
           Column({ space: 0 }) {
-            Text('法律与信息')
-              .fontSize(13)
-              .fontColor(SECONDARY_TEXT)
+            Text($r('app.string.legal'))
+              .fontSize(FontSize.CAPTION)
+              .fontColor(this.colors.textSecondary)
               .width('100%')
-              .padding({ left: 16, bottom: 8 })
+              .padding({ left: Spacing.MD, bottom: Spacing.XS })
 
             Column() {
               // 开源库
               Row() {
-                Text('开源库')
-                  .fontSize(15)
-                  .fontColor(PRIMARY_TEXT)
+                Text($r('app.string.open_source_libraries'))
+                  .fontSize(FontSize.BODY)
+                  .fontColor(this.colors.textPrimary)
                   .layoutWeight(1)
                 Image($r('app.media.ic_chevron_right'))
                   .width(16)
                   .height(16)
-                  .fillColor(SECONDARY_TEXT)
+                  .fillColor(this.colors.textTertiary)
               }
               .width('100%')
               .height(52)
-              .padding({ left: 16, right: 16 })
+              .padding({ left: Spacing.MD, right: Spacing.MD })
               .onClick(() => {
                 router.pushUrl({ url: 'pages/OpenSourcePage' });
               })
 
-              Divider().color('#E1E4E8').margin({ left: 16 })
+              Divider().color(this.colors.border).margin({ left: Spacing.MD })
 
               // 服务条款
               Row() {
-                Text('服务条款')
-                  .fontSize(15)
-                  .fontColor(PRIMARY_TEXT)
+                Text($r('app.string.terms_of_service'))
+                  .fontSize(FontSize.BODY)
+                  .fontColor(this.colors.textPrimary)
                   .layoutWeight(1)
                 Image($r('app.media.ic_chevron_right'))
                   .width(16)
                   .height(16)
-                  .fillColor(SECONDARY_TEXT)
+                  .fillColor(this.colors.textTertiary)
               }
               .width('100%')
               .height(52)
-              .padding({ left: 16, right: 16 })
+              .padding({ left: Spacing.MD, right: Spacing.MD })
               .onClick(() => {
                 router.pushUrl({ url: 'pages/TermsPage' });
               })
 
-              Divider().color('#E1E4E8').margin({ left: 16 })
+              Divider().color(this.colors.border).margin({ left: Spacing.MD })
 
               // 隐私政策
               Row() {
-                Text('隐私政策')
-                  .fontSize(15)
-                  .fontColor(PRIMARY_TEXT)
+                Text($r('app.string.privacy_policy'))
+                  .fontSize(FontSize.BODY)
+                  .fontColor(this.colors.textPrimary)
                   .layoutWeight(1)
                 Image($r('app.media.ic_chevron_right'))
                   .width(16)
                   .height(16)
-                  .fillColor(SECONDARY_TEXT)
+                  .fillColor(this.colors.textTertiary)
               }
               .width('100%')
               .height(52)
-              .padding({ left: 16, right: 16 })
+              .padding({ left: Spacing.MD, right: Spacing.MD })
               .onClick(() => {
                 router.pushUrl({ url: 'pages/PrivacyPage' });
               })
             }
             .width('100%')
-            .backgroundColor(CARD_BG)
-            .borderRadius(12)
+            .backgroundColor(this.colors.surfaceVariant)
+            .borderRadius(BorderRadius.MD)
           }
           .width('100%')
 
           // 账户操作（仅登录后显示）
           if (this.isLoggedIn) {
             Column({ space: 0 }) {
-              Text('账户')
-                .fontSize(13)
-                .fontColor(SECONDARY_TEXT)
+              Text($r('app.string.account'))
+                .fontSize(FontSize.CAPTION)
+                .fontColor(this.colors.textSecondary)
                 .width('100%')
-                .padding({ left: 16, bottom: 8 })
+                .padding({ left: Spacing.MD, bottom: Spacing.XS })
 
               Column() {
                 // 退出登录
                 Row() {
-                  Text('退出登录')
-                    .fontSize(15)
-                    .fontColor(DANGER)
+                  Text($r('app.string.logout'))
+                    .fontSize(FontSize.BODY)
+                    .fontColor(this.colors.error)
                     .layoutWeight(1)
                 }
                 .width('100%')
                 .height(52)
-                .padding({ left: 16, right: 16 })
+                .padding({ left: Spacing.MD, right: Spacing.MD })
                 .onClick(() => {
                   this.handleLogout();
                 })
               }
               .width('100%')
-              .backgroundColor(CARD_BG)
-              .borderRadius(12)
+              .backgroundColor(this.colors.surfaceVariant)
+              .borderRadius(BorderRadius.MD)
             }
             .width('100%')
           }
 
           // 底部说明
-          Column({ space: 8 }) {
-            Text('RepoFlow')
-              .fontSize(16)
+          Column({ space: Spacing.XS }) {
+            Text($r('app.string.settings_brand'))
+              .fontSize(FontSize.SUBTITLE)
               .fontWeight(FontWeight.Medium)
-              .fontColor(SECONDARY_TEXT)
-            Text('一款开源的第三方 GitHub 客户端')
-              .fontSize(13)
-              .fontColor(SECONDARY_TEXT)
-            Text('本应用为个人非盈利项目')
-              .fontSize(12)
-              .fontColor(SECONDARY_TEXT)
-            Text('GitHub 是 GitHub, Inc. 的商标')
-              .fontSize(11)
-              .fontColor('#8C959F')
-              .margin({ top: 4 })
+              .fontColor(this.colors.textSecondary)
+            Text($r('app.string.app_tagline'))
+              .fontSize(FontSize.CAPTION)
+              .fontColor(this.colors.textSecondary)
+            Text($r('app.string.non_profit_project'))
+              .fontSize(FontSize.CAPTION)
+              .fontColor(this.colors.textSecondary)
+            Text($r('app.string.settings_legal_note'))
+              .fontSize(FontSize.TINY)
+              .fontColor(this.colors.textTertiary)
+              .margin({ top: Spacing.XXS })
           }
           .width('100%')
           .alignItems(HorizontalAlign.Center)
-          .padding({ top: 24, bottom: 32 })
+          .padding({ top: Spacing.LG, bottom: Spacing.XL })
         }
-        .padding(16)
+        .padding(Spacing.MD)
         .width('100%')
       }
       .layoutWeight(1)
     }
     .width('100%')
     .height('100%')
-    .backgroundColor('#FFFFFF')
+    .backgroundColor(this.colors.background)
   }
 }

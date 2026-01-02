@@ -57,7 +57,7 @@ struct OpenSourcePage {
           router.back();
         })
 
-        Text('开源库')
+        Text($r('app.string.open_source_libs'))
           .fontSize(18)
           .fontWeight(FontWeight.Medium)
           .fontColor(PRIMARY_TEXT)
@@ -73,7 +73,7 @@ struct OpenSourcePage {
 
       Scroll() {
         Column({ space: 16 }) {
-          Text('本应用使用了以下开源项目，在此表示感谢：')
+          Text($r('app.string.open_source_thanks'))
             .fontSize(14)
             .fontColor(SECONDARY_TEXT)
             .width('100%')
@@ -113,12 +113,12 @@ struct OpenSourcePage {
 
           // MIT License 简要说明
           Column({ space: 8 }) {
-            Text('开源协议说明')
+            Text($r('app.string.open_source_license_title'))
               .fontSize(14)
               .fontWeight(FontWeight.Medium)
               .fontColor(PRIMARY_TEXT)
               .width('100%')
-            Text('本应用遵循 MIT 开源协议发布。您可以自由使用、复制、修改和分发本软件，但需要保留原始版权声明。')
+            Text($r('app.string.open_source_license_desc'))
               .fontSize(13)
               .fontColor(SECONDARY_TEXT)
               .lineHeight(22)

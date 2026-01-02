@@ -19,3 +19,7 @@
 
 # 本地敏感配置（OAuth secrets 等）
 **/config/local.config.ets
+
+# vscode custom extensions
+/.github
+/.shared

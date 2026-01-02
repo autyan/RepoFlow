@@ -1,114 +1,83 @@
+/**
+ * 代码浏览页面
+ *
+ * 使用 RFCodeBrowser 组件提供完整的代码浏览体验:
+ * - 文件树浏览
+ * - 代码查看
+ * - 分支切换
+ * - 响应式布局
+ */
+
 import router from '@ohos.router';
+import { util } from '@kit.ArkTS';
 import { authManager } from '../services/AuthManager';
-import { GitHubBranch, GitHubFileContent } from '../models/GitHubModels';
+import { GitHubBranch } from '../models/GitHubModels';
+import {
+  ThemeManager,
+  ThemeColors,
+  ResponsiveManager,
+  ResponsiveState,
+  Spacing,
+  BorderRadius,
+  FontSize,
+  LayoutMode,
+  DeviceType,
+} from '../theme';
+import {
+  RFCodeBrowser,
+  RFButton,
+  RFPageHeader,
+  FileTreeNode,
+  FileNodeType,
+  getFileExtension,
+} from '../components';
 
-const PRIMARY_TEXT = '#1F2328';
-const SECONDARY_TEXT = '#656D76';
-const CARD_BG = '#F6F8FA';
-const ACCENT = '#F28C28';
-const BORDER_COLOR = '#D0D7DE';
-const FOLDER_COLOR = '#54AEFF';
-
-// 文件图标颜色映射
-class FileIconColors {
-  static ts: string = '#3178C6';
-  static tsx: string = '#3178C6';
-  static js: string = '#F7DF1E';
-  static jsx: string = '#61DAFB';
-  static py: string = '#3776AB';
-  static java: string = '#B07219';
-  static kt: string = '#A97BFF';
-  static go: string = '#00ADD8';
-  static rs: string = '#DEA584';
-  static c: string = '#555555';
-  static cpp: string = '#F34B7D';
-  static h: string = '#555555';
-  static swift: string = '#FA7343';
-  static rb: string = '#CC342D';
-  static php: string = '#777BB4';
-  static cs: string = '#239120';
-  static json: string = '#292929';
-  static yaml: string = '#CB171E';
-  static yml: string = '#CB171E';
-  static xml: string = '#E34C26';
-  static html: string = '#E34C26';
-  static css: string = '#563D7C';
-  static scss: string = '#C6538C';
-  static md: string = '#083FA1';
-  static sh: string = '#89E051';
-  static bat: string = '#C1F12E';
-  static sql: string = '#E38C00';
-  static vue: string = '#4FC08D';
-  static dart: string = '#00B4AB';
-  static ets: string = '#3178C6';
-
-  static getColor(ext: string): string {
-    const colorMap: Record<string, string> = {
-      'ts': FileIconColors.ts,
-      'tsx': FileIconColors.tsx,
-      'js': FileIconColors.js,
-      'jsx': FileIconColors.jsx,
-      'py': FileIconColors.py,
-      'java': FileIconColors.java,
-      'kt': FileIconColors.kt,
-      'go': FileIconColors.go,
-      'rs': FileIconColors.rs,
-      'c': FileIconColors.c,
-      'cpp': FileIconColors.cpp,
-      'h': FileIconColors.h,
-      'swift': FileIconColors.swift,
-      'rb': FileIconColors.rb,
-      'php': FileIconColors.php,
-      'cs': FileIconColors.cs,
-      'json': FileIconColors.json,
-      'yaml': FileIconColors.yaml,
-      'yml': FileIconColors.yml,
-      'xml': FileIconColors.xml,
-      'html': FileIconColors.html,
-      'css': FileIconColors.css,
-      'scss': FileIconColors.scss,
-      'md': FileIconColors.md,
-      'sh': FileIconColors.sh,
-      'bat': FileIconColors.bat,
-      'sql': FileIconColors.sql,
-      'vue': FileIconColors.vue,
-      'dart': FileIconColors.dart,
-      'ets': FileIconColors.ets
-    };
-    return colorMap[ext] || SECONDARY_TEXT;
-  }
-}
-
+// =====================================================
+// 路由参数
+// =====================================================
 interface RouteParams {
   owner: string;
   repo: string;
   branch?: string;
 }
 
-interface FileItem {
-  name: string;
-  path: string;
-  type: 'file' | 'dir';
-  sha: string;
-  size?: number;
-}
-
+// =====================================================
+// 代码浏览页面
+// =====================================================
 @Entry
 @Component
 struct CodeBrowserPage {
-  @State isLoading: boolean = true;
-  @State error: string = '';
+  // 主题状态
+  @State colors: ThemeColors = ThemeManager.colors;
+  @State isDark: boolean = ThemeManager.isDark;
+
+  // 响应式状态
+  @State layoutMode: LayoutMode = ResponsiveManager.state.layoutMode;
+  @State deviceType: DeviceType = ResponsiveManager.state.deviceType;
+
+  // 页面状态
   @State branches: GitHubBranch[] = [];
   @State currentBranch: string = 'main';
-  @State files: FileItem[] = [];
   @State showBranchPicker: boolean = false;
-  @State currentPath: string = '';
-  @State pathStack: string[] = [];
+  @State isLoadingBranches: boolean = false;
+  @State branchPage: number = 1;
+  @State hasMoreBranches: boolean = true;
+  @State branchSearchQuery: string = '';
 
   private owner: string = '';
   private repoName: string = '';
 
+  private t(res: Resource, ...args: Array<string | number>): string {
+    const rm = getContext(this).resourceManager;
+    return rm.getStringSync(res.id, ...args);
+  }
+
+  // =====================================================
+  // 生命周期
+  // =====================================================
+
   aboutToAppear(): void {
+    // 获取路由参数
     const params = router.getParams() as RouteParams | undefined;
     if (params) {
       this.owner = params.owner;
@@ -117,19 +86,45 @@ struct CodeBrowserPage {
         this.currentBranch = params.branch;
       }
       this.loadBranches();
-      this.loadDirectory('');
     }
+
+    // 订阅主题变化
+    ThemeManager.subscribe((colors: ThemeColors, isDark: boolean): void => {
+      this.colors = colors;
+      this.isDark = isDark;
+    });
+
+    // 订阅响应式变化
+    ResponsiveManager.subscribe((state: ResponsiveState): void => {
+      this.layoutMode = state.layoutMode;
+      this.deviceType = state.deviceType;
+    });
   }
 
-  async loadBranches(): Promise<void> {
+  // =====================================================
+  // 数据加载
+  // =====================================================
+
+  async loadBranches(page: number = 1): Promise<void> {
     const api = authManager.getGitHubApi();
     if (!api) return;
 
+    this.isLoadingBranches = true;
+
     try {
-      this.branches = await api.getRepoBranches(this.owner, this.repoName);
-      // 如果有分支列表，使用第一个作为默认分支（通常是默认分支）
-      if (this.branches.length > 0 && this.currentBranch === 'main') {
-        // 检查是否有 main 或 master 分支
+      const newBranches = await api.getRepoBranches(this.owner, this.repoName, page, 20);
+      
+      if (page === 1) {
+        this.branches = newBranches;
+      } else {
+        this.branches = [...this.branches, ...newBranches];
+      }
+      
+      this.branchPage = page;
+      this.hasMoreBranches = newBranches.length >= 20;
+
+      // 使用第一个分支作为默认分支 (仅在首次加载且当前为默认 main 时)
+      if (page === 1 && this.branches.length > 0 && this.currentBranch === 'main') {
         const mainBranch = this.branches.find(b => b.name === 'main' || b.name === 'master');
         if (mainBranch) {
           this.currentBranch = mainBranch.name;
@@ -139,153 +134,132 @@ struct CodeBrowserPage {
       }
     } catch (err) {
       console.error('Load branches failed:', JSON.stringify(err));
+    } finally {
+      this.isLoadingBranches = false;
     }
   }
 
-  async loadDirectory(path: string): Promise<void> {
-    this.isLoading = true;
-    this.error = '';
-
-    const api = authManager.getGitHubApi();
-    if (!api) {
-      this.error = '请先登录';
-      this.isLoading = false;
-      return;
+  loadMoreBranches(): void {
+    if (!this.isLoadingBranches && this.hasMoreBranches) {
+      this.loadBranches(this.branchPage + 1);
     }
+  }
+
+  // 获取目录树
+  async fetchTree(path: string): Promise<FileTreeNode[]> {
+    const api = authManager.getGitHubApi();
+    if (!api) return [];
 
     try {
       const contents = await api.getRepoContents(this.owner, this.repoName, path, this.currentBranch);
+      const depth = path ? path.split('/').length : 0;
 
-      // 转换为 FileItem 并排序
-      const items: FileItem[] = [];
-      for (const item of contents) {
-        const fileItem: FileItem = {
+      // 转换为 FileTreeNode
+      const nodes: FileTreeNode[] = contents.map((item): FileTreeNode => {
+        const node: FileTreeNode = {
           name: item.name,
           path: item.path,
-          type: item.type,
-          sha: item.sha,
-          size: item.size
+          type: item.type === 'dir' ? FileNodeType.DIRECTORY : FileNodeType.FILE,
+          size: item.size,
+          extension: item.type === 'file' ? getFileExtension(item.name) : undefined,
+          depth: depth,
+          parentPath: path || undefined,
+          expanded: false,
+          isLoading: false,
+          childrenLoaded: false,
         };
-        items.push(fileItem);
-      }
+        return node;
+      });
 
-      // 排序：文件夹在前，按名称排序
-      this.files = items.sort((a, b) => {
+      // 排序：目录在前，文件在后，按名称排序
+      return nodes.sort((a, b) => {
         if (a.type !== b.type) {
-          return a.type === 'dir' ? -1 : 1;
+          return a.type === FileNodeType.DIRECTORY ? -1 : 1;
         }
         return a.name.localeCompare(b.name);
       });
-
-      this.currentPath = path;
     } catch (err) {
-      this.error = '加载目录失败';
-      console.error('Load directory failed:', JSON.stringify(err));
-    } finally {
-      this.isLoading = false;
+      console.error('Fetch tree failed:', JSON.stringify(err));
+      return [];
     }
   }
 
-  navigateToFolder(path: string): void {
-    this.pathStack.push(this.currentPath);
-    this.loadDirectory(path);
-  }
+  // 获取文件内容
+  async fetchContent(path: string): Promise<string> {
+    const api = authManager.getGitHubApi();
+    if (!api) return '';
 
-  navigateBack(): void {
-    if (this.pathStack.length > 0) {
-      const previousPath = this.pathStack.pop() || '';
-      this.loadDirectory(previousPath);
-    } else {
-      router.back();
-    }
-  }
-
-  openFile(file: FileItem): void {
-    router.pushUrl({
-      url: 'pages/FileViewerPage',
-      params: {
-        owner: this.owner,
-        repo: this.repoName,
-        path: file.path,
-        branch: this.currentBranch,
-        fileName: file.name
+    try {
+      const content = await api.getFileContent(this.owner, this.repoName, path, this.currentBranch);
+      // GitHub API 返回 base64 编码的内容
+      if (content.encoding === 'base64' && content.content) {
+        // 使用 ArkTS 的 Base64Helper 解码
+        const base64Helper = new util.Base64Helper();
+        const base64Content = content.content.replace(/\n/g, '');
+        const decodedArray = base64Helper.decodeSync(base64Content);
+        const textDecoder = util.TextDecoder.create('utf-8');
+        return textDecoder.decodeToString(decodedArray);
       }
-    });
+      return content.content || '';
+    } catch (err) {
+      console.error('Fetch content failed:', JSON.stringify(err));
+      throw new Error(this.t($r('app.string.load_failed')));
+    }
   }
 
-  getFileExtension(filename: string): string {
-    const parts = filename.split('.');
-    return parts.length > 1 ? parts[parts.length - 1].toLowerCase() : '';
+  // 切换分支
+  switchBranch(branch: string): void {
+    if (branch !== this.currentBranch) {
+      this.currentBranch = branch;
+      // 重新加载页面以刷新内容
+      router.replaceUrl({
+        url: 'pages/CodeBrowserPage',
+        params: {
+          owner: this.owner,
+          repo: this.repoName,
+          branch: branch
+        }
+      });
+    }
+    this.showBranchPicker = false;
   }
 
-  getFileIconColor(filename: string): string {
-    const ext = this.getFileExtension(filename);
-    return FileIconColors.getColor(ext);
+  // 返回导航
+  navigateBack(): void {
+    router.back();
   }
 
-  formatFileSize(bytes: number | undefined): string {
-    if (bytes === undefined) return '';
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  }
-
-  getDisplayPath(): string {
-    if (!this.currentPath) return '/';
-    return '/' + this.currentPath;
-  }
+  // =====================================================
+  // UI 构建
+  // =====================================================
 
   @Builder
-  FileRow(file: FileItem) {
-    Row() {
-      // 文件夹/文件图标
-      if (file.type === 'dir') {
-        Image($r('app.media.ic_folder'))
-          .width(20)
-          .height(20)
-          .fillColor(FOLDER_COLOR)
-      } else {
-        Image($r('app.media.ic_file'))
-          .width(20)
-          .height(20)
-          .fillColor(this.getFileIconColor(file.name))
-      }
+  BranchButton() {
+    Row({ space: Spacing.XS }) {
+      Image($r('app.media.ic_branch'))
+        .width(16)
+        .height(16)
+        .fillColor(this.colors.textSecondary)
 
-      // 文件名
-      Text(file.name)
-        .fontSize(14)
-        .fontColor(PRIMARY_TEXT)
-        .margin({ left: 12 })
-        .layoutWeight(1)
+      Text(this.currentBranch)
+        .fontSize(FontSize.SM)
+        .fontColor(this.colors.textPrimary)
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
 
-      // 文件大小
-      if (file.type === 'file' && file.size !== undefined) {
-        Text(this.formatFileSize(file.size))
-          .fontSize(12)
-          .fontColor(SECONDARY_TEXT)
-      }
-
-      // 文件夹箭头
-      if (file.type === 'dir') {
-        Image($r('app.media.ic_chevron_right'))
-          .width(16)
-          .height(16)
-          .fillColor(SECONDARY_TEXT)
-          .margin({ left: 8 })
-      }
+      Image($r('app.media.ic_chevron_right'))
+        .width(12)
+        .height(12)
+        .fillColor(this.colors.textTertiary)
+        .rotate({ angle: 90 })
     }
-    .width('100%')
-    .height(48)
-    .padding({ left: 16, right: 16 })
-    .backgroundColor('#FFFFFF')
+    .height(32)
+    .padding({ left: Spacing.SM, right: Spacing.SM })
+    .backgroundColor(this.colors.bgSecondary)
+    .borderRadius(BorderRadius.SM)
+    .border({ width: 1, color: this.colors.border })
     .onClick(() => {
-      if (file.type === 'dir') {
-        this.navigateToFolder(file.path);
-      } else {
-        this.openFile(file);
-      }
+      this.showBranchPicker = true;
     })
   }
 
@@ -296,202 +270,195 @@ struct CodeBrowserPage {
       Column()
         .width('100%')
         .height('100%')
-        .backgroundColor('#00000040')
+        .backgroundColor('#00000060')
         .onClick(() => {
           this.showBranchPicker = false;
         })
 
       // 分支选择面板
       Column() {
+        // 标题栏
         Row() {
-          Text('选择分支')
-            .fontSize(16)
+          Text($r('app.string.select_branch'))
+            .fontSize(FontSize.LG)
             .fontWeight(FontWeight.Medium)
-            .fontColor(PRIMARY_TEXT)
+            .fontColor(this.colors.textPrimary)
+
           Blank()
+
           Image($r('app.media.ic_close'))
-            .width(20)
-            .height(20)
-            .fillColor(SECONDARY_TEXT)
+            .width(24)
+            .height(24)
+            .fillColor(this.colors.textSecondary)
             .onClick(() => {
               this.showBranchPicker = false;
             })
         }
         .width('100%')
-        .padding(16)
-        .border({ width: { bottom: 1 }, color: BORDER_COLOR })
+        .padding(Spacing.MD)
+        .border({
+          width: { bottom: 1 },
+          color: this.colors.border
+        })
 
-        List() {
-          ForEach(this.branches, (branch: GitHubBranch) => {
-            ListItem() {
-              Row() {
-                Image($r('app.media.ic_branch'))
-                  .width(16)
-                  .height(16)
-                  .fillColor(SECONDARY_TEXT)
+        // 分支列表
+        Column() {
+          // 搜索框
+          Search({ placeholder: $r('app.string.search_branches') })
+            .width('100%')
+            .height(36)
+            .margin({ bottom: Spacing.SM })
+            .backgroundColor(this.colors.bgSecondary)
+            .placeholderColor(this.colors.textTertiary)
+            .onChange((value: string) => {
+              this.branchSearchQuery = value;
+            })
 
-                Text(branch.name)
-                  .fontSize(14)
-                  .fontColor(PRIMARY_TEXT)
-                  .margin({ left: 12 })
-                  .layoutWeight(1)
+          if (this.isLoadingBranches && this.branches.length === 0) {
+            Column() {
+              LoadingProgress()
+                .width(32)
+                .height(32)
+                .color(this.colors.brandPrimary)
+            }
+            .width('100%')
+            .height(200)
+            .justifyContent(FlexAlign.Center)
+          } else {
+            List() {
+              ForEach(this.branches.filter(b => b.name.toLowerCase().includes(this.branchSearchQuery.toLowerCase())), (branch: GitHubBranch) => {
+                ListItem() {
+                  Row() {
+                    Image($r('app.media.ic_branch'))
+                      .width(18)
+                      .height(18)
+                      .fillColor(this.colors.textSecondary)
 
-                if (branch.name === this.currentBranch) {
-                  Image($r('app.media.ic_check_circle'))
-                    .width(20)
-                    .height(20)
-                    .fillColor(ACCENT)
+                    Text(branch.name)
+                      .fontSize(FontSize.MD)
+                      .fontColor(this.colors.textPrimary)
+                      .margin({ left: Spacing.SM })
+                      .layoutWeight(1)
+
+                    if (branch.name === this.currentBranch) {
+                      Image($r('app.media.ic_check_circle'))
+                        .width(20)
+                        .height(20)
+                        .fillColor(this.colors.success)
+                    }
+                  }
+                  .width('100%')
+                  .height(52)
+                  .padding({ left: Spacing.MD, right: Spacing.MD })
+                  .onClick(() => {
+                    this.switchBranch(branch.name);
+                  })
+                }
+              }, (branch: GitHubBranch) => branch.name)
+
+              // 加载更多
+              if (this.hasMoreBranches) {
+                ListItem() {
+                  Row() {
+                    if (this.isLoadingBranches) {
+                      LoadingProgress()
+                        .width(20)
+                        .height(20)
+                        .color(this.colors.brandPrimary)
+                        .margin({ right: 8 })
+                      Text($r('app.string.loading'))
+                        .fontSize(FontSize.SM)
+                        .fontColor(this.colors.textSecondary)
+                    } else {
+                      Text($r('app.string.load_more'))
+                        .fontSize(FontSize.SM)
+                        .fontColor(this.colors.brandPrimary)
+                    }
+                  }
+                  .width('100%')
+                  .height(48)
+                  .justifyContent(FlexAlign.Center)
+                  .onClick(() => {
+                    this.loadMoreBranches();
+                  })
+                }
+              } else if (this.branches.length > 0) {
+                ListItem() {
+                  Text($r('app.string.no_more_branches'))
+                    .fontSize(FontSize.XS)
+                    .fontColor(this.colors.textTertiary)
+                    .width('100%')
+                    .textAlign(TextAlign.Center)
+                    .padding({ top: Spacing.SM, bottom: Spacing.SM })
                 }
               }
-              .width('100%')
-              .height(48)
-              .padding({ left: 16, right: 16 })
-              .onClick(() => {
-                if (branch.name !== this.currentBranch) {
-                  this.currentBranch = branch.name;
-                  this.pathStack = [];
-                  this.loadDirectory('');
-                }
-                this.showBranchPicker = false;
-              })
             }
-          }, (branch: GitHubBranch) => branch.name)
+            .width('100%')
+            .layoutWeight(1)
+            .divider({
+              strokeWidth: 1,
+              color: this.colors.border,
+              startMargin: Spacing.MD + 18 + Spacing.SM,
+              endMargin: Spacing.MD
+            })
+          }
         }
-        .width('100%')
+        .padding({ left: Spacing.MD, right: Spacing.MD, bottom: Spacing.MD })
         .layoutWeight(1)
       }
       .width('100%')
       .height('60%')
-      .backgroundColor('#FFFFFF')
-      .borderRadius({ topLeft: 16, topRight: 16 })
+      .backgroundColor(this.colors.bgPrimary)
+      .borderRadius({
+        topLeft: BorderRadius.LG,
+        topRight: BorderRadius.LG
+      })
       .position({ y: '40%' })
     }
     .width('100%')
     .height('100%')
   }
 
+  @Builder
+  HeaderActions() {
+    Row({ space: Spacing.SM }) {
+      this.BranchButton()
+    }
+  }
+
   build() {
     Stack() {
       Column() {
-        // 顶部导航栏
-        Row() {
-          Row() {
-            Image($r('app.media.ic_back'))
-              .width(24)
-              .height(24)
-              .fillColor(PRIMARY_TEXT)
-          }
-          .width(40)
-          .height(40)
-          .justifyContent(FlexAlign.Center)
-          .onClick(() => {
-            this.navigateBack();
-          })
-
-          Text('代码')
-            .fontSize(18)
-            .fontWeight(FontWeight.Medium)
-            .fontColor(PRIMARY_TEXT)
-            .layoutWeight(1)
-
-          Blank().width(40)
-        }
-        .width('100%')
-        .height(56)
-        .padding({ left: 8, right: 16 })
-        .backgroundColor('#FFFFFF')
-        .border({ width: { bottom: 1 }, color: BORDER_COLOR })
-
-        // 分支选择器
-        Row() {
-          Image($r('app.media.ic_branch'))
-            .width(16)
-            .height(16)
-            .fillColor(SECONDARY_TEXT)
-
-          Text(this.currentBranch)
-            .fontSize(14)
-            .fontColor(PRIMARY_TEXT)
-            .margin({ left: 8 })
-
-          Image($r('app.media.ic_chevron_right'))
-            .width(14)
-            .height(14)
-            .fillColor(SECONDARY_TEXT)
-            .rotate({ angle: 90 })
-            .margin({ left: 4 })
-
-          Blank()
-
-          // 当前路径
-          Text(this.getDisplayPath())
-            .fontSize(12)
-            .fontColor(SECONDARY_TEXT)
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-        }
-        .width('100%')
-        .height(44)
-        .padding({ left: 16, right: 16 })
-        .backgroundColor(CARD_BG)
-        .onClick(() => {
-          this.showBranchPicker = true;
+        // 页面头部
+        RFPageHeader({
+          title: `${this.owner}/${this.repoName}`,
+          subtitle: $r('app.string.code_browser'),
+          colors: this.colors,
+          showBack: true,
+          onBack: (): void => this.navigateBack(),
+          actions: (): void => this.HeaderActions()
         })
 
-        if (this.isLoading) {
-          Column() {
-            LoadingProgress()
-              .width(40)
-              .height(40)
-            Text('加载中...')
-              .fontSize(14)
-              .fontColor(SECONDARY_TEXT)
-              .margin({ top: 12 })
+        // 代码浏览器
+        RFCodeBrowser({
+          owner: this.owner,
+          repo: this.repoName,
+          branch: this.currentBranch,
+          layoutMode: this.layoutMode,
+          deviceType: this.deviceType,
+          colors: this.colors,
+          onFetchTree: async (path: string): Promise<FileTreeNode[]> => {
+            return await this.fetchTree(path);
+          },
+          onFetchContent: async (path: string): Promise<string> => {
+            return await this.fetchContent(path);
           }
-          .width('100%')
+        })
           .layoutWeight(1)
-          .justifyContent(FlexAlign.Center)
-        } else if (this.error) {
-          Column() {
-            Text(this.error)
-              .fontSize(14)
-              .fontColor(SECONDARY_TEXT)
-            Button('重试')
-              .height(36)
-              .fontSize(14)
-              .margin({ top: 16 })
-              .onClick(() => this.loadDirectory(this.currentPath))
-          }
-          .width('100%')
-          .layoutWeight(1)
-          .justifyContent(FlexAlign.Center)
-        } else if (this.files.length === 0) {
-          Column() {
-            Text('此目录为空')
-              .fontSize(14)
-              .fontColor(SECONDARY_TEXT)
-          }
-          .width('100%')
-          .layoutWeight(1)
-          .justifyContent(FlexAlign.Center)
-        } else {
-          // 文件列表
-          List() {
-            ForEach(this.files, (file: FileItem) => {
-              ListItem() {
-                this.FileRow(file)
-              }
-            }, (file: FileItem) => file.path)
-          }
-          .width('100%')
-          .layoutWeight(1)
-          .backgroundColor('#FFFFFF')
-          .divider({ strokeWidth: 1, color: BORDER_COLOR, startMargin: 48, endMargin: 0 })
-        }
       }
       .width('100%')
       .height('100%')
-      .backgroundColor(CARD_BG)
+      .backgroundColor(this.colors.bgPrimary)
 
       // 分支选择弹窗
       if (this.showBranchPicker) {

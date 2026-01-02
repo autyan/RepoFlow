@@ -2,21 +2,26 @@ import { webview } from '@kit.ArkWeb';
 import { authManager } from '../services/AuthManager';
 import router from '@ohos.router';
 import { promptAction } from '@kit.ArkUI';
-
-const PRIMARY_TEXT = '#1F2328';
-const ACCENT = '#0969DA';
+import { ThemeManager, ThemeColors } from '../theme';
+import { Spacing, FontSize } from '../theme/DesignTokens';
 
 @Entry
 @Component
 struct LoginPage {
   @State isLoading: boolean = true;
   @State loadProgress: number = 0;
+  @State private colors: ThemeColors = ThemeManager.colors;
   private controller: webview.WebviewController = new webview.WebviewController();
   private authUrl: string = '';
 
   aboutToAppear(): void {
     this.authUrl = authManager.getAuthUrl();
     console.info('OAuth URL:', this.authUrl);
+
+    // 订阅主题变化
+    ThemeManager.subscribe((colors: ThemeColors, isDark: boolean) => {
+      this.colors = colors;
+    });
   }
 
   build() {
@@ -24,19 +29,19 @@ struct LoginPage {
       // 顶部导航栏
       Row() {
         Button() {
-          Text('取消')
-            .fontSize(16)
-            .fontColor(ACCENT)
+          Text($r('app.string.cancel'))
+            .fontSize(FontSize.BODY)
+            .fontColor(this.colors.primary)
         }
         .backgroundColor(Color.Transparent)
         .onClick(() => {
           router.back();
         })
 
-        Text('登录 GitHub')
-          .fontSize(17)
+        Text($r('app.string.login_github'))
+          .fontSize(FontSize.SUBTITLE)
           .fontWeight(FontWeight.Medium)
-          .fontColor(PRIMARY_TEXT)
+          .fontColor(this.colors.textPrimary)
           .layoutWeight(1)
           .textAlign(TextAlign.Center)
 
@@ -46,15 +51,15 @@ struct LoginPage {
       }
       .width('100%')
       .height(56)
-      .padding({ left: 16, right: 16 })
-      .backgroundColor('#FFFFFF')
+      .padding({ left: Spacing.MD, right: Spacing.MD })
+      .backgroundColor(this.colors.surface)
 
       // 加载进度条
       if (this.isLoading) {
         Progress({ value: this.loadProgress, total: 100, type: ProgressType.Linear })
           .width('100%')
           .height(2)
-          .color(ACCENT)
+          .color(this.colors.primary)
       }
 
       // WebView
@@ -87,7 +92,7 @@ struct LoginPage {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor('#FFFFFF')
+    .backgroundColor(this.colors.background)
   }
 
   private handleOAuthCallback(url: string): void {
@@ -102,7 +107,7 @@ struct LoginPage {
 
     if (!code) {
       console.error('No authorization code received');
-      promptAction.showToast({ message: '授权失败：未获取到授权码' });
+      promptAction.showToast({ message: getContext(this).resourceManager.getStringSync($r('app.string.auth_failed_no_code').id) });
       router.back();
       return;
     }
@@ -115,16 +120,16 @@ struct LoginPage {
       .then((success) => {
         console.info('OAuth callback result:', success ? 'success' : 'failed');
         if (success) {
-          promptAction.showToast({ message: '登录成功' });
+          promptAction.showToast({ message: getContext(this).resourceManager.getStringSync($r('app.string.login_success').id) });
         } else {
-          promptAction.showToast({ message: '登录失败' });
+          promptAction.showToast({ message: getContext(this).resourceManager.getStringSync($r('app.string.login_failed').id) });
         }
         // 返回设置页
         router.back();
       })
       .catch((err: Error) => {
         console.error('OAuth callback error:', JSON.stringify(err));
-        promptAction.showToast({ message: '登录失败：' + (err.message || '未知错误') });
+        promptAction.showToast({ message: getContext(this).resourceManager.getStringSync($r('app.string.login_error').id) + (err.message || getContext(this).resourceManager.getStringSync($r('app.string.unknown_error').id)) });
         router.back();
       });
   }

@@ -5,20 +5,33 @@
         "name": "default",
         "type": "HarmonyOS",
         "material": {
-          "certpath": "C:\\Users\\autyan\\.ohos\\config\\default_RepoFlow_y4yb54uag_9bFPSPMvqGCnOCHHNpc1uz0cUcf6DP5Kc=.cer",
+          "certpath": "C:/Users/autyan/.ohos/config/default_RepoFlow_y4yb54uag_9bFPSPMvqGCnOCHHNpc1uz0cUcf6DP5Kc=.cer",
           "keyAlias": "debugKey",
-          "keyPassword": "0000001AE23E499951FDD5EA3DE1875552CD8DDC4EC53A3B91A4D27119D475B39DCEE64DD9025F5C1BEB",
-          "profile": "C:\\Users\\autyan\\.ohos\\config\\default_RepoFlow_y4yb54uag_9bFPSPMvqGCnOCHHNpc1uz0cUcf6DP5Kc=.p7b",
+          "keyPassword": "0000001B8B01506CC191E2214B96C02D838F58091175EBEA0E6A273C048D630DAC0D9DE1078B9A16D5CB00",
+          "profile": "C:/Users/autyan/.ohos/config/default_RepoFlow_y4yb54uag_9bFPSPMvqGCnOCHHNpc1uz0cUcf6DP5Kc=.p7b",
           "signAlg": "SHA256withECDSA",
-          "storeFile": "C:\\Users\\autyan\\.ohos\\config\\default_RepoFlow_y4yb54uag_9bFPSPMvqGCnOCHHNpc1uz0cUcf6DP5Kc=.p12",
-          "storePassword": "0000001A3237192AB15468E2119D799A21EBA9CDF37026A24D6EA39BE6F34F247A33EDCB828ECC1FB2DA"
+          "storeFile": "C:/Users/autyan/.ohos/config/default_RepoFlow_y4yb54uag_9bFPSPMvqGCnOCHHNpc1uz0cUcf6DP5Kc=.p12",
+          "storePassword": "0000001B6B91D2113748BCF4423F56BA6FE92BF67195E8D791E573AE5426C4F6B23ED7D85272DED9B3C78D"
+        }
+      },
+      {
+        "name": "release",
+        "type": "HarmonyOS",
+        "material": {
+          "certpath": "D:/WorkBench/HuaWei/Release_Cert.cer",
+          "keyAlias": "repoflowpublish",
+          "keyPassword": "0000001983D498FB5172D855EF63D2E193DBA5D4075932DB501F008BA0AF7980305278367B150D44D5",
+          "profile": "D:/WorkBench/HuaWei/Release_ProfileRelease.p7b",
+          "signAlg": "SHA256withECDSA",
+          "storeFile": "D:/WorkBench/HuaWei/repoflow.p12",
+          "storePassword": "00000019B9041F3E3824BA8A8C8AB32307CBFC56FAADAA91D0C58DE4423F36F97CADD193663C2B3F02"
         }
       }
     ],
     "products": [
       {
         "name": "default",
-        "signingConfig": "default",
+        "signingConfig": "release",
         "targetSdkVersion": "6.0.1(21)",
         "compatibleSdkVersion": "6.0.1(21)",
         "runtimeOS": "HarmonyOS",

@@ -1,6 +1,6 @@
 import http from '@ohos.net.http';
 import { HttpClient, HttpResponse } from '../common/network/HttpClient';
-import { GitHubUser, GitHubRepo, GitHubNotification, GitHubEvent, GitHubOrg, GitHubIssue, GitHubComment, GitHubTree, GitHubFileContent, GitHubBranch } from '../models/GitHubModels';
+import { GitHubUser, GitHubRepo, GitHubNotification, GitHubEvent, GitHubOrg, GitHubIssue, GitHubComment, GitHubTree, GitHubFileContent, GitHubBranch, GitHubSecurityAlert, GitHubSearchResult } from '../models/GitHubModels';
 
 const GITHUB_API_BASE = 'https://api.github.com';
 
@@ -57,6 +57,91 @@ export class GitHubApiService {
   }
 
   /**
+   * 获取用户的安全警报 (Dependabot alerts)
+   * 需要 security_events 权限，返回所有仓库的安全警报
+   */
+  async getSecurityAlerts(state: 'open' | 'dismissed' | 'fixed' = 'open', page: number = 1, perPage: number = 30): Promise<GitHubSecurityAlert[]> {
+    try {
+      // 使用 GraphQL 或者遍历用户仓库获取安全警报
+      // 由于 REST API 需要对每个仓库单独调用，这里先获取用户仓库列表
+      const repos = await this.getUserRepos(1, 100);
+      const alerts: GitHubSecurityAlert[] = [];
+      
+      for (const repo of repos) {
+        try {
+          const response = await this.get<string>(
+            `/repos/${repo.owner.login}/${repo.name}/dependabot/alerts?state=${state}&per_page=10`
+          );
+          const repoAlerts = JSON.parse(response.data) as GitHubSecurityAlert[];
+          // 添加仓库信息到每个警报
+          repoAlerts.forEach(alert => {
+            alert.repository = repo;
+          });
+          alerts.push(...repoAlerts);
+        } catch (e) {
+          // 如果某个仓库没有权限或没有启用 Dependabot，跳过
+          continue;
+        }
+      }
+      
+      // 按更新时间排序并限制数量
+      alerts.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+      return alerts.slice(0, perPage);
+    } catch (error) {
+      console.error('Failed to get security alerts:', JSON.stringify(error));
+      return [];
+    }
+  }
+
+  /**
+   * 获取指派给当前用户的 Issues
+   */
+  async getAssignedIssues(state: 'open' | 'closed' | 'all' = 'open', page: number = 1, perPage: number = 30): Promise<GitHubIssue[]> {
+    const response = await this.get<string>(`/issues?filter=assigned&state=${state}&page=${page}&per_page=${perPage}&sort=updated`);
+    return JSON.parse(response.data) as GitHubIssue[];
+  }
+
+  /**
+   * 获取当前用户创建的 Issues
+   */
+  async getCreatedIssues(state: 'open' | 'closed' | 'all' = 'open', page: number = 1, perPage: number = 30): Promise<GitHubIssue[]> {
+    const response = await this.get<string>(`/issues?filter=created&state=${state}&page=${page}&per_page=${perPage}&sort=updated`);
+    return JSON.parse(response.data) as GitHubIssue[];
+  }
+
+  /**
+   * 获取提及当前用户的 Issues
+   */
+  async getMentionedIssues(state: 'open' | 'closed' | 'all' = 'open', page: number = 1, perPage: number = 30): Promise<GitHubIssue[]> {
+    const response = await this.get<string>(`/issues?filter=mentioned&state=${state}&page=${page}&per_page=${perPage}&sort=updated`);
+    return JSON.parse(response.data) as GitHubIssue[];
+  }
+
+  /**
+   * 获取当前用户订阅的 Issues
+   */
+  async getSubscribedIssues(state: 'open' | 'closed' | 'all' = 'open', page: number = 1, perPage: number = 30): Promise<GitHubIssue[]> {
+    const response = await this.get<string>(`/issues?filter=subscribed&state=${state}&page=${page}&per_page=${perPage}&sort=updated`);
+    return JSON.parse(response.data) as GitHubIssue[];
+  }
+
+  /**
+   * 获取当前用户的活动事件
+   */
+  async getUserEvents(username: string, page: number = 1, perPage: number = 30): Promise<GitHubEvent[]> {
+    const response = await this.get<string>(`/users/${username}/events?page=${page}&per_page=${perPage}`);
+    return JSON.parse(response.data) as GitHubEvent[];
+  }
+
+  /**
+   * 获取当前用户收到的事件 (动态)
+   */
+  async getReceivedEvents(username: string, page: number = 1, perPage: number = 30): Promise<GitHubEvent[]> {
+    const response = await this.get<string>(`/users/${username}/received_events?page=${page}&per_page=${perPage}`);
+    return JSON.parse(response.data) as GitHubEvent[];
+  }
+
+  /**
    * 标记通知为已读
    */
   async markNotificationAsRead(threadId: string): Promise<void> {
@@ -109,14 +194,6 @@ export class GitHubApiService {
   async getFollowing(username: string, page: number = 1, perPage: number = 30): Promise<GitHubUser[]> {
     const response = await this.get<string>(`/users/${username}/following?page=${page}&per_page=${perPage}`);
     return JSON.parse(response.data) as GitHubUser[];
-  }
-
-  /**
-   * 获取用户的公开事件/活动
-   */
-  async getUserEvents(username: string, page: number = 1, perPage: number = 30): Promise<GitHubEvent[]> {
-    const response = await this.get<string>(`/users/${username}/events/public?page=${page}&per_page=${perPage}`);
-    return JSON.parse(response.data) as GitHubEvent[];
   }
 
   /**
@@ -189,8 +266,8 @@ export class GitHubApiService {
   /**
    * 获取仓库分支列表
    */
-  async getRepoBranches(owner: string, repo: string): Promise<GitHubBranch[]> {
-    const response = await this.get<string>(`/repos/${owner}/${repo}/branches`);
+  async getRepoBranches(owner: string, repo: string, page: number = 1, perPage: number = 30): Promise<GitHubBranch[]> {
+    const response = await this.get<string>(`/repos/${owner}/${repo}/branches?page=${page}&per_page=${perPage}`);
     return JSON.parse(response.data) as GitHubBranch[];
   }
 
@@ -287,13 +364,4 @@ export class GitHubApiService {
       body
     });
   }
-}
-
-/**
- * GitHub 搜索结果
- */
-export interface GitHubSearchResult<T> {
-  total_count: number;
-  incomplete_results: boolean;
-  items: T[];
 }

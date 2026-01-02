@@ -15,6 +15,8 @@
     "pages/FileViewerPage",
     "pages/IssuesPage",
     "pages/IssueDetailPage",
-    "pages/CreateIssuePage"
+    "pages/CreateIssuePage",
+    "pages/SecurityAlertsPage",
+    "pages/SecurityAlertDetailPage"
   ]
 }

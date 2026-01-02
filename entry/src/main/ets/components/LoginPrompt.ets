@@ -11,8 +11,8 @@ const ICON_COLOR = '#57606A';
  */
 @Component
 export struct LoginPrompt {
-  @Prop title: string = '登录后查看更多';
-  @Prop subtitle: string = '登录 GitHub 账号，解锁完整功能';
+  @Prop title: string | Resource = $r('app.string.repos_login_hint');
+  @Prop subtitle: string | Resource = $r('app.string.login_description');
   @Prop showDismiss: boolean = true;
   onDismiss?: () => void;
 
@@ -47,15 +47,15 @@ export struct LoginPrompt {
 
       // 功能亮点
       Column({ space: 8 }) {
-        this.FeatureItem($r('app.media.ic_repo'), '查看和管理您的仓库')
-        this.FeatureItem($r('app.media.ic_bell'), '接收 Issue 和 PR 通知')
-        this.FeatureItem($r('app.media.ic_star'), '访问已加星的项目')
-        this.FeatureItem($r('app.media.ic_user'), '查看个人资料和统计')
+        this.FeatureItem($r('app.media.ic_repo'), $r('app.string.feature_view_manage_repos'))
+        this.FeatureItem($r('app.media.ic_bell'), $r('app.string.feature_receive_notifications'))
+        this.FeatureItem($r('app.media.ic_star'), $r('app.string.feature_access_starred'))
+        this.FeatureItem($r('app.media.ic_user'), $r('app.string.feature_view_profile_stats'))
       }
       .margin({ top: 8, bottom: 8 })
 
       // 登录按钮
-      Button('立即登录')
+      Button($r('app.string.login_now'))
         .width('80%')
         .height(44)
         .fontSize(16)
@@ -68,7 +68,7 @@ export struct LoginPrompt {
 
       // 稍后再说
       if (this.showDismiss) {
-        Text('稍后再说')
+        Text($r('app.string.later'))
           .fontSize(14)
           .fontColor(SECONDARY_TEXT)
           .onClick(() => {
@@ -85,7 +85,7 @@ export struct LoginPrompt {
   }
 
   @Builder
-  FeatureItem(icon: Resource, text: string) {
+  FeatureItem(icon: Resource, text: string | Resource) {
     Row({ space: 12 }) {
       Image(icon)
         .width(16)

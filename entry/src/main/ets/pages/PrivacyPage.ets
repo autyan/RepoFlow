@@ -23,7 +23,7 @@ struct PrivacyPage {
           router.back();
         })
 
-        Text('隐私政策')
+        Text($r('app.string.privacy_policy'))
           .fontSize(18)
           .fontWeight(FontWeight.Medium)
           .fontColor(PRIMARY_TEXT)
@@ -39,13 +39,13 @@ struct PrivacyPage {
 
       Scroll() {
         Column({ space: 16 }) {
-          Text('RepoFlow 隐私政策')
+          Text($r('app.string.privacy_repoflow'))
             .fontSize(20)
             .fontWeight(FontWeight.Bold)
             .fontColor(PRIMARY_TEXT)
             .width('100%')
 
-          Text('最后更新日期：2024年12月')
+          Text($r('app.string.privacy_update_date'))
             .fontSize(12)
             .fontColor(SECONDARY_TEXT)
             .width('100%')

@@ -1,26 +1,28 @@
+/**
+ * 文件查看器页面
+ * 
+ * 功能:
+ * - 显示代码文件内容
+ * - 支持语法高亮
+ * - 支持响应式布局和主题切换
+ */
+
 import router from '@ohos.router';
 import { authManager } from '../services/AuthManager';
-
-const PRIMARY_TEXT = '#1F2328';
-const SECONDARY_TEXT = '#656D76';
-const CARD_BG = '#F6F8FA';
-const ACCENT = '#F28C28';
-const BORDER_COLOR = '#D0D7DE';
-const CODE_BG = '#F6F8FA';
-
-// 语法高亮颜色
-class SyntaxColors {
-  static keyword: string = '#CF222E';
-  static string: string = '#0A3069';
-  static comment: string = '#6E7781';
-  static number: string = '#0550AE';
-  static function: string = '#8250DF';
-  static class: string = '#953800';
-  static operator: string = '#CF222E';
-  static property: string = '#0550AE';
-  static builtin: string = '#8250DF';
-  static punctuation: string = '#1F2328';
-}
+import {
+  ThemeManager,
+  ThemeColors,
+  ResponsiveManager,
+  ResponsiveState,
+  Spacing,
+  BorderRadius,
+  FontSize,
+  LayoutMode,
+  DeviceType,
+} from '../theme';
+import {
+  RFButton,
+} from '../components';
 
 // 关键字映射
 const KEYWORDS: Record<string, string[]> = {
@@ -44,9 +46,13 @@ interface CodeLine {
   content: string;
 }
 
+// =====================================================
+// 文件查看器页面
+// =====================================================
 @Entry
 @Component
 struct FileViewerPage {
+  // 数据状态
   @State isLoading: boolean = true;
   @State error: string = '';
   @State fileContent: string = '';
@@ -56,9 +62,37 @@ struct FileViewerPage {
   private owner: string = '';
   private repoName: string = '';
   private filePath: string = '';
-  private branch: string = '';
+  private branch: string = 'main';
+
+  private t(res: Resource, ...args: Array<string | number>): string {
+    const rm = getContext(this).resourceManager;
+    return rm.getStringSync(res.id, ...args);
+  }
+
+  // 主题状态
+  @State colors: ThemeColors = ThemeManager.colors;
+  @State isDark: boolean = ThemeManager.isDark;
+
+  // 响应式状态
+  @State layoutMode: LayoutMode = ResponsiveManager.state.layoutMode;
+  @State deviceType: DeviceType = ResponsiveManager.state.deviceType;
+
+  // =====================================================
+  // 生命周期
+  // =====================================================
 
   aboutToAppear(): void {
+    // 订阅主题变化
+    ThemeManager.subscribe((colors: ThemeColors, isDark: boolean): void => {
+      this.colors = colors;
+      this.isDark = isDark;
+    });
+    // 订阅响应式变化
+    ResponsiveManager.subscribe((state: ResponsiveState): void => {
+      this.layoutMode = state.layoutMode;
+      this.deviceType = state.deviceType;
+    });
+
     const params = router.getParams() as RouteParams | undefined;
     if (params) {
       this.owner = params.owner;
@@ -70,13 +104,17 @@ struct FileViewerPage {
     }
   }
 
+  // =====================================================
+  // 数据加载
+  // =====================================================
+
   async loadFile(): Promise<void> {
     this.isLoading = true;
     this.error = '';
 
     const api = authManager.getGitHubApi();
     if (!api) {
-      this.error = '请先登录';
+      this.error = this.t($r('app.string.please_login'));
       this.isLoading = false;
       return;
     }
@@ -86,7 +124,7 @@ struct FileViewerPage {
       this.fileContent = content;
       this.parseCodeLines(content);
     } catch (err) {
-      this.error = '加载文件失败';
+      this.error = this.t($r('app.string.load_file_failed'));
       console.error('Load file failed:', JSON.stringify(err));
     } finally {
       this.isLoading = false;
@@ -102,6 +140,10 @@ struct FileViewerPage {
     }
     this.codeLines = result;
   }
+
+  // =====================================================
+  // 工具方法
+  // =====================================================
 
   getFileExtension(): string {
     const parts = this.fileName.split('.');
@@ -144,33 +186,102 @@ struct FileViewerPage {
     return languageMap[ext] || ext.toUpperCase() || 'Text';
   }
 
-  isKeyword(word: string): boolean {
-    const ext = this.getFileExtension();
-    let lang = ext;
-    if (ext === 'tsx' || ext === 'ets') lang = 'ts';
-    if (ext === 'jsx') lang = 'js';
+  // =====================================================
+  // UI 构建器
+  // =====================================================
 
-    const keywords = KEYWORDS[lang] || KEYWORDS['ts'] || [];
-    return keywords.includes(word);
+  // 页面头部
+  @Builder
+  PageHeader() {
+    Row() {
+      Row() {
+        Image($r('app.media.ic_back'))
+          .width(24)
+          .height(24)
+          .fillColor(this.colors.textPrimary)
+      }
+      .width(40)
+      .height(40)
+      .justifyContent(FlexAlign.Center)
+      .onClick((): void => {
+        router.back();
+      })
+
+      Column() {
+        Text(this.fileName)
+          .fontSize(FontSize.LG)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(this.colors.textPrimary)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+
+        Text(this.filePath)
+          .fontSize(FontSize.SM)
+          .fontColor(this.colors.textSecondary)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+      }
+      .alignItems(HorizontalAlign.Start)
+      .layoutWeight(1)
+
+      Blank().width(40)
+    }
+    .width('100%')
+    .height(56)
+    .padding({ left: Spacing.SM, right: Spacing.MD })
+    .backgroundColor(this.colors.bgPrimary)
+    .border({ width: { bottom: 1 }, color: this.colors.border })
   }
 
+  // 文件信息栏
+  @Builder
+  FileInfoBar() {
+    Row() {
+      // 语言标签
+      Row() {
+        Text(this.getLanguage())
+          .fontSize(FontSize.SM)
+          .fontColor('#FFFFFF')
+      }
+      .padding({ left: 8, right: 8, top: 4, bottom: 4 })
+      .borderRadius(4)
+      .backgroundColor(this.colors.brandPrimary)
+
+      Text($r('app.string.lines_count', this.codeLines.length))
+        .fontSize(FontSize.SM)
+        .fontColor(this.colors.textSecondary)
+        .margin({ left: Spacing.MD })
+
+      Blank()
+
+      Text(this.branch)
+        .fontSize(FontSize.SM)
+        .fontColor(this.colors.textSecondary)
+    }
+    .width('100%')
+    .height(40)
+    .padding({ left: Spacing.MD, right: Spacing.MD })
+    .backgroundColor(this.colors.bgSecondary)
+  }
+
+  // 代码行
   @Builder
   CodeLineItem(codeLine: CodeLine) {
     Row() {
       // 行号
       Text(codeLine.lineNumber.toString())
-        .fontSize(12)
-        .fontColor(SECONDARY_TEXT)
+        .fontSize(FontSize.SM)
+        .fontColor(this.colors.textTertiary)
         .fontFamily('monospace')
         .textAlign(TextAlign.End)
         .width(40)
-        .padding({ right: 12 })
-        .backgroundColor('#F0F0F0')
+        .padding({ right: Spacing.MD })
+        .backgroundColor(this.colors.bgTertiary)
 
       // 代码内容
       Text(codeLine.content)
-        .fontSize(13)
-        .fontColor(PRIMARY_TEXT)
+        .fontSize(FontSize.SM)
+        .fontColor(this.colors.textPrimary)
         .fontFamily('monospace')
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Clip })
@@ -181,123 +292,88 @@ struct FileViewerPage {
     .padding({ top: 2, bottom: 2 })
   }
 
-  build() {
-    Column() {
-      // 顶部导航栏
-      Row() {
-        Row() {
-          Image($r('app.media.ic_back'))
-            .width(24)
-            .height(24)
-            .fillColor(PRIMARY_TEXT)
-        }
+  // 加载状态
+  @Builder
+  LoadingView() {
+    Column({ space: Spacing.SM }) {
+      LoadingProgress()
         .width(40)
         .height(40)
-        .justifyContent(FlexAlign.Center)
-        .onClick(() => {
-          router.back();
-        })
+        .color(this.colors.brandPrimary)
+      Text($r('app.string.loading'))
+        .fontSize(FontSize.MD)
+        .fontColor(this.colors.textSecondary)
+    }
+    .width('100%')
+    .layoutWeight(1)
+    .justifyContent(FlexAlign.Center)
+  }
 
-        Column() {
-          Text(this.fileName)
-            .fontSize(16)
-            .fontWeight(FontWeight.Medium)
-            .fontColor(PRIMARY_TEXT)
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-
-          Text(this.filePath)
-            .fontSize(12)
-            .fontColor(SECONDARY_TEXT)
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
+  // 错误状态
+  @Builder
+  ErrorView() {
+    Column({ space: Spacing.SM }) {
+      Text(this.error)
+        .fontSize(FontSize.MD)
+        .fontColor(this.colors.textSecondary)
+      RFButton({
+        text: $r('app.string.retry'),
+        variant: 'secondary',
+        buttonSize: 'md',
+        colors: this.colors,
+        onTap: (): void => {
+          this.loadFile();
         }
-        .alignItems(HorizontalAlign.Start)
-        .layoutWeight(1)
+      })
+        .margin({ top: Spacing.MD })
+    }
+    .width('100%')
+    .layoutWeight(1)
+    .justifyContent(FlexAlign.Center)
+  }
 
-        Blank().width(40)
+  // 代码内容
+  @Builder
+  CodeContent() {
+    Scroll() {
+      Column() {
+        ForEach(this.codeLines, (line: CodeLine) => {
+          this.CodeLineItem(line)
+        }, (line: CodeLine) => line.lineNumber.toString())
       }
       .width('100%')
-      .height(56)
-      .padding({ left: 8, right: 16 })
-      .backgroundColor('#FFFFFF')
-      .border({ width: { bottom: 1 }, color: BORDER_COLOR })
+      .alignItems(HorizontalAlign.Start)
+    }
+    .width('100%')
+    .layoutWeight(1)
+    .backgroundColor(this.colors.surface)
+    .scrollBar(BarState.Auto)
+    .scrollBarColor(this.colors.textSecondary)
+  }
 
-      // 文件信息栏
-      Row() {
-        // 语言标签
-        Row() {
-          Text(this.getLanguage())
-            .fontSize(12)
-            .fontColor('#FFFFFF')
-        }
-        .padding({ left: 8, right: 8, top: 4, bottom: 4 })
-        .borderRadius(4)
-        .backgroundColor(ACCENT)
+  // =====================================================
+  // 主构建方法
+  // =====================================================
 
-        Text(`${this.codeLines.length} 行`)
-          .fontSize(12)
-          .fontColor(SECONDARY_TEXT)
-          .margin({ left: 12 })
+  build() {
+    Column() {
+      // 页面头部
+      this.PageHeader()
 
-        Blank()
+      // 文件信息
+      this.FileInfoBar()
 
-        Text(this.branch)
-          .fontSize(12)
-          .fontColor(SECONDARY_TEXT)
-      }
-      .width('100%')
-      .height(40)
-      .padding({ left: 16, right: 16 })
-      .backgroundColor(CARD_BG)
-
+      // 内容区域
       if (this.isLoading) {
-        Column() {
-          LoadingProgress()
-            .width(40)
-            .height(40)
-          Text('加载中...')
-            .fontSize(14)
-            .fontColor(SECONDARY_TEXT)
-            .margin({ top: 12 })
-        }
-        .width('100%')
-        .layoutWeight(1)
-        .justifyContent(FlexAlign.Center)
+        this.LoadingView()
       } else if (this.error) {
-        Column() {
-          Text(this.error)
-            .fontSize(14)
-            .fontColor(SECONDARY_TEXT)
-          Button('重试')
-            .height(36)
-            .fontSize(14)
-            .margin({ top: 16 })
-            .onClick(() => this.loadFile())
-        }
-        .width('100%')
-        .layoutWeight(1)
-        .justifyContent(FlexAlign.Center)
+        this.ErrorView()
       } else {
-        // 代码内容
-        Scroll() {
-          Column() {
-            ForEach(this.codeLines, (line: CodeLine) => {
-              this.CodeLineItem(line)
-            }, (line: CodeLine) => line.lineNumber.toString())
-          }
-          .width('100%')
-          .alignItems(HorizontalAlign.Start)
-        }
-        .width('100%')
-        .layoutWeight(1)
-        .backgroundColor('#FFFFFF')
-        .scrollBar(BarState.Auto)
-        .scrollBarColor(SECONDARY_TEXT)
+        this.CodeContent()
       }
     }
     .width('100%')
     .height('100%')
-    .backgroundColor(CARD_BG)
+    .backgroundColor(this.colors.bgSecondary)
   }
 }

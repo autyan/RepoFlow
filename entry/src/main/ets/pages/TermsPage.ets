@@ -23,7 +23,7 @@ struct TermsPage {
           router.back();
         })
 
-        Text('服务条款')
+        Text($r('app.string.terms_of_service'))
           .fontSize(18)
           .fontWeight(FontWeight.Medium)
           .fontColor(PRIMARY_TEXT)
@@ -39,13 +39,13 @@ struct TermsPage {
 
       Scroll() {
         Column({ space: 16 }) {
-          Text('RepoFlow 服务条款')
+          Text($r('app.string.terms_repoflow'))
             .fontSize(20)
             .fontWeight(FontWeight.Bold)
             .fontColor(PRIMARY_TEXT)
             .width('100%')
 
-          Text('最后更新日期：2024年12月')
+          Text($r('app.string.terms_update_date'))
             .fontSize(12)
             .fontColor(SECONDARY_TEXT)
             .width('100%')

@@ -1,13 +1,7 @@
 import router from '@ohos.router';
 import { authManager } from '../services/AuthManager';
-
-// 配色 - 清爽浅色主题
-const BG_PRIMARY = '#FFFFFF';
-const BG_SECONDARY = '#F8FAFC';
-const ACCENT_ORANGE = '#F28C28';
-const TEXT_PRIMARY = '#1F2328';
-const TEXT_SECONDARY = '#656D76';
-const TEXT_TERTIARY = '#8B949E';
+import { ThemeManager, ThemeColors } from '../theme';
+import { Spacing, BorderRadius, FontSize, AnimationDuration } from '../theme/DesignTokens';
 
 @Entry
 @Component
@@ -17,11 +11,17 @@ struct SplashPage {
   @State decorOpacity: number = 0;
   @State logoScale: number = 0.8;
   @State logoY: number = 20;
+  @State private colors: ThemeColors = ThemeManager.colors;
 
   aboutToAppear(): void {
+    // 订阅主题变化
+    ThemeManager.subscribe((colors: ThemeColors, isDark: boolean) => {
+      this.colors = colors;
+    });
+
     // 动画序列
     setTimeout(() => {
-      animateTo({ duration: 600, curve: Curve.EaseOut }, () => {
+      animateTo({ duration: AnimationDuration.NORMAL, curve: Curve.EaseOut }, () => {
         this.logoOpacity = 1;
         this.logoScale = 1;
         this.logoY = 0;
@@ -29,13 +29,13 @@ struct SplashPage {
     }, 200);
 
     setTimeout(() => {
-      animateTo({ duration: 500, curve: Curve.EaseOut }, () => {
+      animateTo({ duration: AnimationDuration.FAST, curve: Curve.EaseOut }, () => {
         this.sloganOpacity = 1;
       });
     }, 600);
 
     setTimeout(() => {
-      animateTo({ duration: 400, curve: Curve.EaseOut }, () => {
+      animateTo({ duration: AnimationDuration.FAST, curve: Curve.EaseOut }, () => {
         this.decorOpacity = 1;
       });
     }, 900);
@@ -52,15 +52,15 @@ struct SplashPage {
       Blank().layoutWeight(1)
 
       // Logo 区域
-      Column({ space: 20 }) {
+      Column({ space: Spacing.MD }) {
         // App 图标 - 突出显示
         Image($r('app.media.app_icon'))
           .width(100)
           .height(100)
-          .borderRadius(24)
+          .borderRadius(BorderRadius.XL)
           .shadow({
             radius: 24,
-            color: '#F28C2840',
+            color: this.colors.primaryContainer as string,
             offsetX: 0,
             offsetY: 8
           })
@@ -69,17 +69,17 @@ struct SplashPage {
           .translate({ y: this.logoY })
 
         // App 名称
-        Text('RepoFlow')
-          .fontSize(32)
+        Text($r('app.string.settings_brand'))
+          .fontSize(FontSize.DISPLAY)
           .fontWeight(FontWeight.Bold)
-          .fontColor(TEXT_PRIMARY)
+          .fontColor(this.colors.textPrimary)
           .opacity(this.logoOpacity)
           .translate({ y: this.logoY })
 
         // 副标题
-        Text('您的 GitHub 移动助手')
-          .fontSize(15)
-          .fontColor(TEXT_SECONDARY)
+        Text($r('app.string.app_description'))
+          .fontSize(FontSize.BODY)
+          .fontColor(this.colors.textSecondary)
           .opacity(this.logoOpacity)
           .translate({ y: this.logoY })
       }
@@ -89,26 +89,26 @@ struct SplashPage {
       Blank().height(60)
 
       // Slogan 区域
-      Column({ space: 16 }) {
+      Column({ space: Spacing.MD }) {
         // 分隔线
         Row()
           .width(40)
           .height(3)
           .borderRadius(1.5)
-          .backgroundColor(ACCENT_ORANGE)
+          .backgroundColor(this.colors.primary)
           .opacity(this.sloganOpacity)
 
         // 中文 Slogan
-        Text('通过代码，构建美好世界')
-          .fontSize(18)
+        Text($r('app.string.slogan'))
+          .fontSize(FontSize.SUBTITLE)
           .fontWeight(FontWeight.Medium)
-          .fontColor(TEXT_PRIMARY)
+          .fontColor(this.colors.textPrimary)
           .opacity(this.sloganOpacity)
 
         // 英文 Slogan
-        Text('Building a Better World Through Code')
-          .fontSize(13)
-          .fontColor(TEXT_TERTIARY)
+        Text($r('app.string.app_tagline'))
+          .fontSize(FontSize.CAPTION)
+          .fontColor(this.colors.textTertiary)
           .opacity(this.sloganOpacity)
       }
 
@@ -116,27 +116,27 @@ struct SplashPage {
       Blank().layoutWeight(1)
 
       // 底部加载区域
-      Column({ space: 12 }) {
+      Column({ space: Spacing.SM }) {
         // 加载动画
-        Row({ space: 6 }) {
+        Row({ space: Spacing.XS }) {
           ForEach([0, 1, 2], (index: number) => {
             Circle({ width: 6, height: 6 })
-              .fill(index === 1 ? ACCENT_ORANGE : '#E5E7EB')
+              .fill(index === 1 ? this.colors.primary : this.colors.border)
           })
         }
         .opacity(this.decorOpacity)
 
         // 版本信息
-        Text('v1.0.0')
-          .fontSize(11)
-          .fontColor(TEXT_TERTIARY)
+        Text($r('app.string.app_version_value'))
+          .fontSize(FontSize.TINY)
+          .fontColor(this.colors.textTertiary)
           .opacity(this.decorOpacity)
       }
       .margin({ bottom: 50 })
     }
     .width('100%')
     .height('100%')
-    .backgroundColor(BG_PRIMARY)
-    .padding({ left: 24, right: 24 })
+    .backgroundColor(this.colors.background)
+    .padding({ left: Spacing.LG, right: Spacing.LG })
   }
 }

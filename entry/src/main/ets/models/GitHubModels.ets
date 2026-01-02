@@ -214,3 +214,76 @@ export interface GitHubBranch {
   commit: GitHubBranchCommit;
   protected: boolean;
 }
+
+/**
+ * 安全警报相关的辅助接口
+ */
+export interface SecurityAlertPackage {
+  ecosystem: string;
+  name: string;
+}
+
+export interface SecurityAlertDependency {
+  package: SecurityAlertPackage;
+  manifest_path: string;
+  scope: string;
+}
+
+export interface SecurityAdvisoryPatchedVersion {
+  identifier: string;
+}
+
+export interface GitHubVulnerability {
+  package: SecurityAlertPackage;
+  severity: string;
+  vulnerable_version_range: string;
+  first_patched_version: SecurityAdvisoryPatchedVersion | null;
+}
+
+export interface SecurityAdvisory {
+  ghsa_id: string;
+  cve_id: string | null;
+  summary: string;
+  description: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  vulnerabilities: GitHubVulnerability[];
+  published_at: string;
+  updated_at: string;
+}
+
+export interface SecurityVulnerability {
+  package: SecurityAlertPackage;
+  severity: string;
+  vulnerable_version_range: string;
+  first_patched_version: SecurityAdvisoryPatchedVersion | null;
+}
+
+/**
+ * GitHub Dependabot 安全警报
+ */
+export interface GitHubSecurityAlert {
+  number: number;
+  state: 'open' | 'dismissed' | 'fixed';
+  dependency: SecurityAlertDependency;
+  security_advisory: SecurityAdvisory;
+  security_vulnerability: SecurityVulnerability;
+  url: string;
+  html_url: string;
+  created_at: string;
+  updated_at: string;
+  dismissed_at: string | null;
+  dismissed_by: GitHubUser | null;
+  dismissed_reason: string | null;
+  dismissed_comment: string | null;
+  fixed_at: string | null;
+  repository?: GitHubRepo;
+}
+
+/**
+ * GitHub 搜索结果
+ */
+export interface GitHubSearchResult<T> {
+  total_count: number;
+  incomplete_results: boolean;
+  items: T[];
+}

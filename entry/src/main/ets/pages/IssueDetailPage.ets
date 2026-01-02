@@ -1,17 +1,36 @@
+/**
+ * Issue 详情页面
+ * 
+ * 功能:
+ * - 显示 Issue 详细信息
+ * - 显示评论列表
+ * - 支持添加评论
+ * - 支持响应式布局和主题切换
+ */
+
 import router from '@ohos.router';
 import promptAction from '@ohos.promptAction';
+import pasteboard from '@ohos.pasteboard';
 import { authManager } from '../services/AuthManager';
 import { GitHubIssue, GitHubComment, GitHubLabel } from '../models/GitHubModels';
 import { Markdown, MarkdownController } from '@luvi/lv-markdown-in';
-import pasteboard from '@ohos.pasteboard';
-
-const PRIMARY_TEXT = '#1F2328';
-const SECONDARY_TEXT = '#656D76';
-const CARD_BG = '#F6F8FA';
-const ACCENT = '#F28C28';
-const BORDER_COLOR = '#D0D7DE';
-const OPEN_COLOR = '#1A7F37';
-const CLOSED_COLOR = '#8250DF';
+import {
+  ThemeManager,
+  ThemeColors,
+  ResponsiveManager,
+  ResponsiveState,
+  Spacing,
+  BorderRadius,
+  FontSize,
+  LayoutMode,
+  DeviceType,
+} from '../theme';
+import {
+  RFCard,
+  RFButton,
+  RFAvatar,
+  RFSplitView,
+} from '../components';
 
 interface RouteParams {
   owner: string;
@@ -19,9 +38,13 @@ interface RouteParams {
   issueNumber: number;
 }
 
+// =====================================================
+// Issue 详情页面
+// =====================================================
 @Entry
 @Component
 struct IssueDetailPage {
+  // 数据状态
   @State isLoading: boolean = true;
   @State error: string = '';
   @State issue: GitHubIssue | null = null;
@@ -36,19 +59,53 @@ struct IssueDetailPage {
   private issueNumber: number = 0;
   private markdownController: MarkdownController = new MarkdownController();
 
+  // 主题状态
+  @State colors: ThemeColors = ThemeManager.colors;
+  @State isDark: boolean = ThemeManager.isDark;
+
+  // 响应式状态
+  @State layoutMode: LayoutMode = ResponsiveManager.state.layoutMode;
+  @State deviceType: DeviceType = ResponsiveManager.state.deviceType;
+
+  // =====================================================
+  // 生命周期
+  // =====================================================
+
   aboutToAppear(): void {
+    // 订阅主题变化
+    ThemeManager.subscribe((colors: ThemeColors, isDark: boolean): void => {
+      this.colors = colors;
+      this.isDark = isDark;
+      // 更新 Markdown 样式
+      this.markdownController
+        .setTitleColor(colors.textPrimary)
+        .setTextColor(colors.textSecondary)
+        .setCodeBlockTheme(isDark ? 'dark' : 'light')
+        .setQuoteBorderColor(colors.brandPrimary)
+        .setQuoteBackgroundColor(colors.bgTertiary)
+        .setHyperlinkTextColor(colors.brandPrimary)
+        .setInlineCodeColor(colors.syntaxKeyword)
+        .setInlineCodeBackgroundColor(colors.bgSecondary);
+    });
+
+    // 订阅响应式变化
+    ResponsiveManager.subscribe((state: ResponsiveState): void => {
+      this.layoutMode = state.layoutMode;
+      this.deviceType = state.deviceType;
+    });
+
     // 配置 Markdown 样式
     this.markdownController
-      .setTitleColor(PRIMARY_TEXT)
-      .setTextColor(SECONDARY_TEXT)
+      .setTitleColor(this.colors.textPrimary)
+      .setTextColor(this.colors.textSecondary)
       .setTextSize(14)
-      .setCodeBlockTheme('light')
-      .setQuoteBorderColor(ACCENT)
-      .setQuoteBackgroundColor('#F6F8FA')
-      .setHyperlinkTextColor(ACCENT)
-      .setInlineCodeColor('#CF222E')
-      .setInlineCodeBackgroundColor('#FFF1F0')
-      .setCodeCopyListener((code: string) => {
+      .setCodeBlockTheme(this.isDark ? 'dark' : 'light')
+      .setQuoteBorderColor(this.colors.brandPrimary)
+      .setQuoteBackgroundColor(this.colors.bgTertiary)
+      .setHyperlinkTextColor(this.colors.brandPrimary)
+      .setInlineCodeColor(this.colors.syntaxKeyword)
+      .setInlineCodeBackgroundColor(this.colors.bgSecondary)
+      .setCodeCopyListener((code: string): void => {
         this.copyToClipboard(code);
       });
 
@@ -61,15 +118,19 @@ struct IssueDetailPage {
     }
   }
 
+  // =====================================================
+  // 数据加载
+  // =====================================================
+
   async copyToClipboard(text: string): Promise<void> {
     try {
       const pasteboardData = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, text);
       const systemPasteboard = pasteboard.getSystemPasteboard();
       await systemPasteboard.setData(pasteboardData);
-      promptAction.showToast({ message: '已复制到剪贴板' });
+      promptAction.showToast({ message: getContext(this).resourceManager.getStringSync($r('app.string.copied_to_clipboard').id) });
     } catch (err) {
       console.error('Copy failed:', JSON.stringify(err));
-      promptAction.showToast({ message: '复制失败' });
+      promptAction.showToast({ message: getContext(this).resourceManager.getStringSync($r('app.string.copy_failed').id) });
     }
   }
 
@@ -79,7 +140,7 @@ struct IssueDetailPage {
 
     const api = authManager.getGitHubApi();
     if (!api) {
-      this.error = '请先登录';
+      this.error = getContext(this).resourceManager.getStringSync($r('app.string.please_login').id);
       this.isLoading = false;
       return;
     }
@@ -88,7 +149,7 @@ struct IssueDetailPage {
       this.issue = await api.getIssue(this.owner, this.repoName, this.issueNumber);
       this.loadComments();
     } catch (err) {
-      this.error = '加载 Issue 失败';
+      this.error = getContext(this).resourceManager.getStringSync($r('app.string.load_issue_failed').id);
       console.error('Load issue failed:', JSON.stringify(err));
     } finally {
       this.isLoading = false;
@@ -112,15 +173,16 @@ struct IssueDetailPage {
   }
 
   async submitComment(): Promise<void> {
+    const rm = getContext(this).resourceManager;
     if (!this.commentText.trim()) {
-      promptAction.showToast({ message: '请输入评论内容' });
+      promptAction.showToast({ message: rm.getStringSync($r('app.string.enter_comment_content').id) });
       return;
     }
 
     this.isSubmitting = true;
     const api = authManager.getGitHubApi();
     if (!api) {
-      promptAction.showToast({ message: '请先登录' });
+      promptAction.showToast({ message: rm.getStringSync($r('app.string.please_login').id) });
       this.isSubmitting = false;
       return;
     }
@@ -130,30 +192,35 @@ struct IssueDetailPage {
       this.comments.push(newComment);
       this.commentText = '';
       this.showCommentInput = false;
-      promptAction.showToast({ message: '评论成功' });
+      promptAction.showToast({ message: rm.getStringSync($r('app.string.comment_success').id) });
     } catch (err) {
-      promptAction.showToast({ message: '评论失败' });
+      promptAction.showToast({ message: rm.getStringSync($r('app.string.comment_failed').id) });
       console.error('Submit comment failed:', JSON.stringify(err));
     } finally {
       this.isSubmitting = false;
     }
   }
 
+  // =====================================================
+  // 工具方法
+  // =====================================================
+
   formatDate(dateStr: string): string {
     const date = new Date(dateStr);
     const now = new Date();
     const diff = now.getTime() - date.getTime();
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const rm = getContext(this).resourceManager;
 
     if (days === 0) {
       const hours = Math.floor(diff / (1000 * 60 * 60));
       if (hours === 0) {
         const minutes = Math.floor(diff / (1000 * 60));
-        return `${minutes} 分钟前`;
+        return rm.getStringSync($r('app.string.minutes_ago').id).replace('%d', minutes.toString());
       }
-      return `${hours} 小时前`;
+      return rm.getStringSync($r('app.string.hours_ago').id).replace('%d', hours.toString());
     } else if (days < 30) {
-      return `${days} 天前`;
+      return rm.getStringSync($r('app.string.days_ago').id).replace('%d', days.toString());
     } else {
       return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
     }
@@ -175,24 +242,63 @@ struct IssueDetailPage {
     return brightness > 128;
   }
 
+  // =====================================================
+  // UI 构建器
+  // =====================================================
+
+  // 页面头部
+  @Builder
+  PageHeader() {
+    Row() {
+      Row() {
+        Image($r('app.media.ic_back'))
+          .width(24)
+          .height(24)
+          .fillColor(this.colors.textPrimary)
+      }
+      .width(40)
+      .height(40)
+      .justifyContent(FlexAlign.Center)
+      .onClick((): void => {
+        router.back();
+      })
+
+      Text(getContext(this).resourceManager.getStringSync($r('app.string.issue_title_with_number').id, this.issueNumber))
+        .fontSize(FontSize.XL)
+        .fontWeight(FontWeight.Medium)
+        .fontColor(this.colors.textPrimary)
+        .layoutWeight(1)
+
+      Blank().width(40)
+    }
+    .width('100%')
+    .height(56)
+    .padding({ left: Spacing.SM, right: Spacing.MD })
+    .backgroundColor(this.colors.bgPrimary)
+    .border({ width: { bottom: 1 }, color: this.colors.border })
+  }
+
+  // 评论项
   @Builder
   CommentItem(comment: GitHubComment) {
-    Column({ space: 12 }) {
-      Row({ space: 10 }) {
-        Image(comment.user.avatar_url)
-          .width(32)
-          .height(32)
-          .borderRadius(16)
+    Column({ space: Spacing.MD }) {
+      Row({ space: Spacing.SM }) {
+        RFAvatar({
+          src: comment.user.avatar_url,
+          alt: comment.user.login,
+          avatarSize: 'sm',
+          colors: this.colors
+        })
 
         Column({ space: 2 }) {
           Text(comment.user.login)
-            .fontSize(14)
+            .fontSize(FontSize.MD)
             .fontWeight(FontWeight.Medium)
-            .fontColor(PRIMARY_TEXT)
+            .fontColor(this.colors.textPrimary)
 
           Text(this.formatDate(comment.created_at))
-            .fontSize(12)
-            .fontColor(SECONDARY_TEXT)
+            .fontSize(FontSize.SM)
+            .fontColor(this.colors.textSecondary)
         }
         .alignItems(HorizontalAlign.Start)
         .layoutWeight(1)
@@ -208,229 +314,273 @@ struct IssueDetailPage {
       }
     }
     .width('100%')
-    .padding(16)
-    .backgroundColor('#FFFFFF')
-    .borderRadius(8)
-    .margin({ bottom: 12 })
+    .padding(Spacing.MD)
+    .backgroundColor(this.colors.bgSecondary)
+    .borderRadius(BorderRadius.MD)
+    .margin({ bottom: Spacing.MD })
   }
+
+  // Issue 主体
+  @Builder
+  IssueBody() {
+    if (this.issue) {
+      Column({ space: Spacing.MD }) {
+        // 状态和标题
+        Row({ space: Spacing.SM }) {
+          Row() {
+            Text(this.issue.state === 'open' ? $r('app.string.issue_state_open') : $r('app.string.issue_state_closed'))
+              .fontSize(FontSize.SM)
+              .fontColor('#FFFFFF')
+          }
+          .padding({ left: 10, right: 10, top: 4, bottom: 4 })
+          .borderRadius(12)
+          .backgroundColor(this.issue.state === 'open' ? this.colors.githubOpen : this.colors.githubClosed)
+        }
+        .width('100%')
+
+        Text(this.issue.title)
+          .fontSize(FontSize.XL)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(this.colors.textPrimary)
+
+        // 作者信息
+        Row({ space: Spacing.SM }) {
+          RFAvatar({
+            src: this.issue.user.avatar_url,
+            alt: this.issue.user.login,
+            avatarSize: 'sm',
+            colors: this.colors
+          })
+
+          Text(getContext(this).resourceManager.getStringSync($r('app.string.created_by').id)
+            .replace('%s', this.issue.user.login)
+            .replace('%s', this.formatDate(this.issue.created_at)))
+            .fontSize(FontSize.SM)
+            .fontColor(this.colors.textSecondary)
+        }
+
+        // 标签
+        if (this.issue.labels && this.issue.labels.length > 0) {
+          Flex({ wrap: FlexWrap.Wrap }) {
+            ForEach(this.issue.labels, (label: GitHubLabel) => {
+              Text(label.name)
+                .fontSize(11)
+                .fontColor(this.isLightColor(this.getLabelColor(label.color)) ? '#1F2328' : '#FFFFFF')
+                .backgroundColor(this.getLabelColor(label.color))
+                .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+                .borderRadius(10)
+                .margin({ right: 6, bottom: 6 })
+            }, (label: GitHubLabel) => label.id.toString())
+          }
+          .width('100%')
+        }
+
+        // Issue 正文
+        if (this.issue.body) {
+          Markdown({
+            text: this.issue.body,
+            controller: this.markdownController
+          })
+        } else {
+          Text($r('app.string.no_description'))
+            .fontSize(FontSize.MD)
+            .fontColor(this.colors.textSecondary)
+            .fontStyle(FontStyle.Italic)
+        }
+      }
+      .width('100%')
+      .padding(Spacing.MD)
+      .backgroundColor(this.colors.bgSecondary)
+      .borderRadius(BorderRadius.MD)
+    }
+  }
+
+  // 评论区
+  @Builder
+  CommentsSection() {
+    if (this.issue && (this.comments.length > 0 || this.isLoadingComments)) {
+      Column({ space: Spacing.MD }) {
+        Text(getContext(this).resourceManager.getStringSync($r('app.string.comments_count').id)
+          .replace('%d', this.issue.comments.toString()))
+          .fontSize(FontSize.LG)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(this.colors.textPrimary)
+
+        if (this.isLoadingComments) {
+          Row({ space: Spacing.SM }) {
+            LoadingProgress()
+              .width(16)
+              .height(16)
+              .color(this.colors.brandPrimary)
+            Text($r('app.string.loading_comments'))
+              .fontSize(FontSize.SM)
+              .fontColor(this.colors.textSecondary)
+          }
+        } else {
+          ForEach(this.comments, (comment: GitHubComment) => {
+            this.CommentItem(comment)
+          }, (comment: GitHubComment) => comment.id.toString())
+        }
+      }
+      .width('100%')
+      .alignItems(HorizontalAlign.Start)
+    }
+  }
+
+  // 评论输入区
+  @Builder
+  CommentInput() {
+    if (!this.isLoading && !this.error && this.issue) {
+      Row({ space: Spacing.MD }) {
+        if (this.showCommentInput) {
+          TextInput({ placeholder: $r('app.string.add_comment_placeholder'), text: this.commentText })
+            .layoutWeight(1)
+            .height(40)
+            .backgroundColor(this.colors.bgSecondary)
+            .borderRadius(BorderRadius.MD)
+            .onChange((value: string): void => {
+              this.commentText = value;
+            })
+
+          if (this.isSubmitting) {
+            LoadingProgress()
+              .width(24)
+              .height(24)
+              .color(this.colors.brandPrimary)
+          } else {
+            RFButton({
+              text: $r('app.string.send'),
+              variant: 'primary',
+              buttonSize: 'sm',
+              colors: this.colors,
+              onTap: (): void => {
+                this.submitComment();
+              }
+            })
+          }
+
+          Text($r('app.string.cancel'))
+            .fontSize(FontSize.MD)
+            .fontColor(this.colors.textSecondary)
+            .onClick((): void => {
+              this.showCommentInput = false;
+              this.commentText = '';
+            })
+        } else {
+          RFButton({
+            text: $r('app.string.add_comment'),
+            variant: 'primary',
+            buttonSize: 'md',
+            fullWidth: true,
+            colors: this.colors,
+            onTap: (): void => {
+              this.showCommentInput = true;
+            }
+          })
+        }
+      }
+      .width('100%')
+      .padding(Spacing.MD)
+      .backgroundColor(this.colors.bgPrimary)
+      .border({ width: { top: 1 }, color: this.colors.border })
+    }
+  }
+
+  // 加载状态
+  @Builder
+  LoadingView() {
+    Column({ space: Spacing.SM }) {
+      LoadingProgress()
+        .width(40)
+        .height(40)
+        .color(this.colors.brandPrimary)
+      Text($r('app.string.loading'))
+        .fontSize(FontSize.MD)
+        .fontColor(this.colors.textSecondary)
+    }
+    .width('100%')
+    .layoutWeight(1)
+    .justifyContent(FlexAlign.Center)
+  }
+
+  // 错误状态
+  @Builder
+  ErrorView() {
+    Column({ space: Spacing.SM }) {
+      Text(this.error)
+        .fontSize(FontSize.MD)
+        .fontColor(this.colors.textSecondary)
+      RFButton({
+        text: $r('app.string.retry'),
+        variant: 'secondary',
+        buttonSize: 'md',
+        colors: this.colors,
+        onTap: (): void => {
+          this.loadIssue();
+        }
+      })
+        .margin({ top: Spacing.MD })
+    }
+    .width('100%')
+    .layoutWeight(1)
+    .justifyContent(FlexAlign.Center)
+  }
+
+  // 主内容区域
+  @Builder
+  MainContent() {
+    Scroll() {
+      Column({ space: Spacing.MD }) {
+        this.IssueBody()
+        this.CommentsSection()
+        // 底部留白，给输入框留空间
+        Row().height(80)
+      }
+      .width('100%')
+      .padding(Spacing.MD)
+    }
+    .width('100%')
+    .layoutWeight(1)
+  }
+
+  // =====================================================
+  // 主构建方法
+  // =====================================================
 
   build() {
     Stack() {
       Column() {
-        // 顶部导航栏
-        Row() {
-          Row() {
-            Image($r('app.media.ic_back'))
-              .width(24)
-              .height(24)
-              .fillColor(PRIMARY_TEXT)
-          }
-          .width(40)
-          .height(40)
-          .justifyContent(FlexAlign.Center)
-          .onClick(() => {
-            router.back();
-          })
+        // 页面头部
+        this.PageHeader()
 
-          Text(`Issue #${this.issueNumber}`)
-            .fontSize(18)
-            .fontWeight(FontWeight.Medium)
-            .fontColor(PRIMARY_TEXT)
-            .layoutWeight(1)
-
-          Blank().width(40)
-        }
-        .width('100%')
-        .height(56)
-        .padding({ left: 8, right: 16 })
-        .backgroundColor('#FFFFFF')
-        .border({ width: { bottom: 1 }, color: BORDER_COLOR })
-
+        // 内容区域
         if (this.isLoading) {
-          Column() {
-            LoadingProgress()
-              .width(40)
-              .height(40)
-            Text('加载中...')
-              .fontSize(14)
-              .fontColor(SECONDARY_TEXT)
-              .margin({ top: 12 })
-          }
-          .width('100%')
-          .layoutWeight(1)
-          .justifyContent(FlexAlign.Center)
+          this.LoadingView()
         } else if (this.error) {
-          Column() {
-            Text(this.error)
-              .fontSize(14)
-              .fontColor(SECONDARY_TEXT)
-            Button('重试')
-              .height(36)
-              .fontSize(14)
-              .margin({ top: 16 })
-              .onClick(() => this.loadIssue())
-          }
-          .width('100%')
-          .layoutWeight(1)
-          .justifyContent(FlexAlign.Center)
-        } else if (this.issue) {
-          Scroll() {
-            Column({ space: 16 }) {
-              // Issue 主体
-              Column({ space: 12 }) {
-                // 状态和标题
-                Row({ space: 8 }) {
-                  Row() {
-                    Text(this.issue.state === 'open' ? 'Open' : 'Closed')
-                      .fontSize(12)
-                      .fontColor('#FFFFFF')
-                  }
-                  .padding({ left: 10, right: 10, top: 4, bottom: 4 })
-                  .borderRadius(12)
-                  .backgroundColor(this.issue.state === 'open' ? OPEN_COLOR : CLOSED_COLOR)
-                }
-                .width('100%')
-
-                Text(this.issue.title)
-                  .fontSize(18)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor(PRIMARY_TEXT)
-
-                // 作者信息
-                Row({ space: 10 }) {
-                  Image(this.issue.user.avatar_url)
-                    .width(24)
-                    .height(24)
-                    .borderRadius(12)
-
-                  Text(`${this.issue.user.login} 创建于 ${this.formatDate(this.issue.created_at)}`)
-                    .fontSize(13)
-                    .fontColor(SECONDARY_TEXT)
-                }
-
-                // 标签
-                if (this.issue.labels && this.issue.labels.length > 0) {
-                  Flex({ wrap: FlexWrap.Wrap }) {
-                    ForEach(this.issue.labels, (label: GitHubLabel) => {
-                      Text(label.name)
-                        .fontSize(11)
-                        .fontColor(this.isLightColor(this.getLabelColor(label.color)) ? '#1F2328' : '#FFFFFF')
-                        .backgroundColor(this.getLabelColor(label.color))
-                        .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-                        .borderRadius(10)
-                        .margin({ right: 6, bottom: 6 })
-                    }, (label: GitHubLabel) => label.id.toString())
-                  }
-                  .width('100%')
-                }
-
-                // Issue 正文
-                if (this.issue.body) {
-                  Markdown({
-                    text: this.issue.body,
-                    controller: this.markdownController
-                  })
-                } else {
-                  Text('暂无描述')
-                    .fontSize(14)
-                    .fontColor(SECONDARY_TEXT)
-                    .fontStyle(FontStyle.Italic)
-                }
+          this.ErrorView()
+        } else {
+          // 对于大屏，限制最大宽度
+          if (this.layoutMode !== LayoutMode.SINGLE) {
+            Row() {
+              Blank()
+              Column() {
+                this.MainContent()
+                this.CommentInput()
               }
-              .width('100%')
-              .padding(16)
-              .backgroundColor('#FFFFFF')
-              .borderRadius(8)
-
-              // 评论区
-              if (this.comments.length > 0 || this.isLoadingComments) {
-                Column({ space: 12 }) {
-                  Text(`评论 (${this.issue.comments})`)
-                    .fontSize(16)
-                    .fontWeight(FontWeight.Medium)
-                    .fontColor(PRIMARY_TEXT)
-
-                  if (this.isLoadingComments) {
-                    Row({ space: 8 }) {
-                      LoadingProgress()
-                        .width(16)
-                        .height(16)
-                      Text('加载评论中...')
-                        .fontSize(13)
-                        .fontColor(SECONDARY_TEXT)
-                    }
-                  } else {
-                    ForEach(this.comments, (comment: GitHubComment) => {
-                      this.CommentItem(comment)
-                    }, (comment: GitHubComment) => comment.id.toString())
-                  }
-                }
-                .width('100%')
-                .alignItems(HorizontalAlign.Start)
-              }
-
-              // 底部留白，给输入框留空间
-              Row().height(80)
+              .width(800)
+              Blank()
             }
             .width('100%')
-            .padding(16)
+            .layoutWeight(1)
+          } else {
+            this.MainContent()
+            this.CommentInput()
           }
-          .width('100%')
-          .layoutWeight(1)
-        }
-
-        // 底部评论输入区
-        if (!this.isLoading && !this.error && this.issue) {
-          Row({ space: 12 }) {
-            if (this.showCommentInput) {
-              TextInput({ placeholder: '添加评论...', text: this.commentText })
-                .layoutWeight(1)
-                .height(40)
-                .backgroundColor('#FFFFFF')
-                .borderRadius(8)
-                .onChange((value: string) => {
-                  this.commentText = value;
-                })
-
-              if (this.isSubmitting) {
-                LoadingProgress()
-                  .width(24)
-                  .height(24)
-              } else {
-                Button('发送')
-                  .height(40)
-                  .fontSize(14)
-                  .backgroundColor(ACCENT)
-                  .onClick(() => this.submitComment())
-              }
-
-              Text('取消')
-                .fontSize(14)
-                .fontColor(SECONDARY_TEXT)
-                .onClick(() => {
-                  this.showCommentInput = false;
-                  this.commentText = '';
-                })
-            } else {
-              Button('添加评论')
-                .width('100%')
-                .height(44)
-                .fontSize(14)
-                .backgroundColor(ACCENT)
-                .onClick(() => {
-                  this.showCommentInput = true;
-                })
-            }
-          }
-          .width('100%')
-          .padding(16)
-          .backgroundColor('#FFFFFF')
-          .border({ width: { top: 1 }, color: BORDER_COLOR })
         }
       }
       .width('100%')
       .height('100%')
-      .backgroundColor(CARD_BG)
+      .backgroundColor(this.colors.bgPrimary)
     }
     .width('100%')
     .height('100%')

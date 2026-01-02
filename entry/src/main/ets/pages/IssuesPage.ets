@@ -1,23 +1,44 @@
+/**
+ * Issues 列表页面
+ * 
+ * 功能:
+ * - 显示仓库的 Issue 列表
+ * - 支持筛选 (open/closed/all)
+ * - 支持响应式布局和主题切换
+ */
+
 import router from '@ohos.router';
 import { authManager } from '../services/AuthManager';
 import { GitHubIssue, GitHubLabel } from '../models/GitHubModels';
-
-const PRIMARY_TEXT = '#1F2328';
-const SECONDARY_TEXT = '#656D76';
-const CARD_BG = '#F6F8FA';
-const ACCENT = '#F28C28';
-const BORDER_COLOR = '#D0D7DE';
-const OPEN_COLOR = '#1A7F37';
-const CLOSED_COLOR = '#8250DF';
+import {
+  ThemeManager,
+  ThemeColors,
+  ResponsiveManager,
+  ResponsiveState,
+  Spacing,
+  BorderRadius,
+  FontSize,
+  LayoutMode,
+  DeviceType,
+} from '../theme';
+import {
+  RFCard,
+  RFButton,
+  RFSplitView,
+} from '../components';
 
 interface RouteParams {
   owner: string;
   repo: string;
 }
 
+// =====================================================
+// Issues 页面
+// =====================================================
 @Entry
 @Component
 struct IssuesPage {
+  // 数据状态
   @State isLoading: boolean = true;
   @State error: string = '';
   @State issues: GitHubIssue[] = [];
@@ -25,11 +46,36 @@ struct IssuesPage {
   @State currentPage: number = 1;
   @State hasMore: boolean = true;
   @State isLoadingMore: boolean = false;
+  @State selectedIssue: GitHubIssue | null = null;
 
   private owner: string = '';
   private repoName: string = '';
 
+  // 主题状态
+  @State colors: ThemeColors = ThemeManager.colors;
+  @State isDark: boolean = ThemeManager.isDark;
+
+  // 响应式状态
+  @State layoutMode: LayoutMode = ResponsiveManager.state.layoutMode;
+  @State deviceType: DeviceType = ResponsiveManager.state.deviceType;
+
+  // =====================================================
+  // 生命周期
+  // =====================================================
+
   aboutToAppear(): void {
+    // 订阅主题变化
+    ThemeManager.subscribe((colors: ThemeColors, isDark: boolean): void => {
+      this.colors = colors;
+      this.isDark = isDark;
+    });
+
+    // 订阅响应式变化
+    ResponsiveManager.subscribe((state: ResponsiveState): void => {
+      this.layoutMode = state.layoutMode;
+      this.deviceType = state.deviceType;
+    });
+
     const params = router.getParams() as RouteParams | undefined;
     if (params) {
       this.owner = params.owner;
@@ -37,6 +83,10 @@ struct IssuesPage {
       this.loadIssues();
     }
   }
+
+  // =====================================================
+  // 数据加载
+  // =====================================================
 
   async loadIssues(loadMore: boolean = false): Promise<void> {
     if (loadMore) {
@@ -50,7 +100,7 @@ struct IssuesPage {
 
     const api = authManager.getGitHubApi();
     if (!api) {
-      this.error = '请先登录';
+      this.error = getContext(this).resourceManager.getStringSync($r('app.string.please_login').id);
       this.isLoading = false;
       return;
     }
@@ -59,8 +109,7 @@ struct IssuesPage {
       const newIssues = await api.getRepoIssues(this.owner, this.repoName, this.filterState, this.currentPage);
       
       // 过滤掉 Pull Request（GitHub API 会在 issues 中包含 PR）
-      const filteredIssues = newIssues.filter(issue => {
-        // GitHub Issues API 中 pull_request 字段存在时表示这是一个 PR
+      const filteredIssues = newIssues.filter((issue: GitHubIssue): boolean => {
         return issue.pull_request === undefined;
       });
 
@@ -75,7 +124,7 @@ struct IssuesPage {
         this.currentPage++;
       }
     } catch (err) {
-      this.error = '加载 Issue 列表失败';
+      this.error = getContext(this).resourceManager.getStringSync($r('app.string.load_issues_failed').id);
       console.error('Load issues failed:', JSON.stringify(err));
     } finally {
       this.isLoading = false;
@@ -83,28 +132,47 @@ struct IssuesPage {
     }
   }
 
+  handleIssueClick(issue: GitHubIssue): void {
+    if (this.layoutMode !== LayoutMode.SINGLE) {
+      this.selectedIssue = issue;
+    } else {
+      router.pushUrl({
+        url: 'pages/IssueDetailPage',
+        params: {
+          owner: this.owner,
+          repo: this.repoName,
+          issueNumber: issue.number
+        }
+      });
+    }
+  }
+
+  // =====================================================
+  // 工具方法
+  // =====================================================
+
   formatDate(dateStr: string): string {
     const date = new Date(dateStr);
     const now = new Date();
     const diff = now.getTime() - date.getTime();
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const rm = getContext(this).resourceManager;
 
     if (days === 0) {
       const hours = Math.floor(diff / (1000 * 60 * 60));
       if (hours === 0) {
         const minutes = Math.floor(diff / (1000 * 60));
-        return `${minutes} 分钟前`;
+        return rm.getStringSync($r('app.string.minutes_ago').id).replace('%d', minutes.toString());
       }
-      return `${hours} 小时前`;
+      return rm.getStringSync($r('app.string.hours_ago').id).replace('%d', hours.toString());
     } else if (days < 30) {
-      return `${days} 天前`;
+      return rm.getStringSync($r('app.string.days_ago').id).replace('%d', days.toString());
     } else {
       return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
     }
   }
 
   getLabelColor(color: string): string {
-    // 确保颜色格式正确
     if (color.startsWith('#')) {
       return color;
     }
@@ -112,7 +180,6 @@ struct IssuesPage {
   }
 
   isLightColor(hexColor: string): boolean {
-    // 判断颜色是否是浅色，以决定文字颜色
     const hex = hexColor.replace('#', '');
     const r = parseInt(hex.substring(0, 2), 16);
     const g = parseInt(hex.substring(2, 4), 16);
@@ -121,26 +188,80 @@ struct IssuesPage {
     return brightness > 128;
   }
 
+  // =====================================================
+  // UI 构建器
+  // =====================================================
+
+  // 页面头部
+  @Builder
+  PageHeader() {
+    Row() {
+      Row() {
+        Image($r('app.media.ic_back'))
+          .width(24)
+          .height(24)
+          .fillColor(this.colors.textPrimary)
+      }
+      .width(40)
+      .height(40)
+      .justifyContent(FlexAlign.Center)
+      .onClick((): void => {
+        router.back();
+      })
+
+      Text($r('app.string.issues_tab_title'))
+        .fontSize(FontSize.XL)
+        .fontWeight(FontWeight.Medium)
+        .fontColor(this.colors.textPrimary)
+        .layoutWeight(1)
+
+      // 新建 Issue 按钮
+      Row() {
+        Text(getContext(this).resourceManager.getStringSync($r('app.string.plus_sign').id))
+          .fontSize(24)
+          .fontColor(this.colors.brandPrimary)
+      }
+      .width(40)
+      .height(40)
+      .justifyContent(FlexAlign.Center)
+      .onClick((): void => {
+        router.pushUrl({
+          url: 'pages/CreateIssuePage',
+          params: {
+            owner: this.owner,
+            repo: this.repoName
+          }
+        });
+      })
+    }
+    .width('100%')
+    .height(56)
+    .padding({ left: Spacing.SM, right: Spacing.SM })
+    .backgroundColor(this.colors.bgPrimary)
+    .border({ width: { bottom: 1 }, color: this.colors.border })
+  }
+
+  // 筛选标签
   @Builder
   FilterTabs() {
     Row({ space: 0 }) {
       ForEach(['open', 'closed', 'all'] as ('open' | 'closed' | 'all')[], (state: 'open' | 'closed' | 'all') => {
         Column() {
-          Text(state === 'open' ? '开放' : state === 'closed' ? '已关闭' : '全部')
-            .fontSize(14)
-            .fontColor(this.filterState === state ? ACCENT : SECONDARY_TEXT)
+          Text(state === 'open' ? $r('app.string.issue_state_open') : state === 'closed' ? $r('app.string.issue_state_closed') : $r('app.string.issue_state_all'))
+            .fontSize(FontSize.MD)
+            .fontColor(this.filterState === state ? this.colors.brandPrimary : this.colors.textSecondary)
             .fontWeight(this.filterState === state ? FontWeight.Medium : FontWeight.Normal)
 
           Row()
             .width(40)
             .height(2)
-            .backgroundColor(this.filterState === state ? ACCENT : 'transparent')
+            .backgroundColor(this.filterState === state ? this.colors.brandPrimary : 'transparent')
             .margin({ top: 8 })
         }
         .layoutWeight(1)
         .height(44)
         .justifyContent(FlexAlign.End)
-        .onClick(() => {
+        .onClick((): void => {
           if (this.filterState !== state) {
             this.filterState = state;
             this.loadIssues();
@@ -149,24 +270,25 @@ struct IssuesPage {
       }, (state: string) => state)
     }
     .width('100%')
-    .backgroundColor('#FFFFFF')
-    .border({ width: { bottom: 1 }, color: BORDER_COLOR })
+    .backgroundColor(this.colors.bgPrimary)
+    .border({ width: { bottom: 1 }, color: this.colors.border })
   }
 
+  // Issue 卡片
   @Builder
-  IssueItem(issue: GitHubIssue) {
-    Column({ space: 8 }) {
-      Row({ space: 8 }) {
+  IssueCard(issue: GitHubIssue) {
+    Column({ space: Spacing.SM }) {
+      Row({ space: Spacing.SM }) {
         // 状态图标
         Image(issue.state === 'open' ? $r('app.media.ic_issue_open') : $r('app.media.ic_check_circle'))
           .width(18)
           .height(18)
-          .fillColor(issue.state === 'open' ? OPEN_COLOR : CLOSED_COLOR)
+          .fillColor(issue.state === 'open' ? this.colors.githubOpen : this.colors.githubClosed)
 
         // 标题
         Text(issue.title)
-          .fontSize(15)
-          .fontColor(PRIMARY_TEXT)
+          .fontSize(FontSize.MD)
+          .fontColor(this.colors.textPrimary)
           .fontWeight(FontWeight.Medium)
           .layoutWeight(1)
           .maxLines(2)
@@ -192,14 +314,14 @@ struct IssuesPage {
       }
 
       // 元信息
-      Row({ space: 16 }) {
+      Row({ space: Spacing.MD }) {
         Text(`#${issue.number}`)
-          .fontSize(12)
-          .fontColor(SECONDARY_TEXT)
+          .fontSize(FontSize.SM)
+          .fontColor(this.colors.textSecondary)
 
-        Text(`由 ${issue.user.login} 创建于 ${this.formatDate(issue.created_at)}`)
-          .fontSize(12)
-          .fontColor(SECONDARY_TEXT)
+        Text(`${issue.user.login} · ${this.formatDate(issue.created_at)}`)
+          .fontSize(FontSize.SM)
+          .fontColor(this.colors.textSecondary)
           .layoutWeight(1)
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -209,170 +331,273 @@ struct IssuesPage {
             Image($r('app.media.ic_comment'))
               .width(14)
               .height(14)
-              .fillColor(SECONDARY_TEXT)
+              .fillColor(this.colors.textSecondary)
             Text(issue.comments.toString())
-              .fontSize(12)
-              .fontColor(SECONDARY_TEXT)
+              .fontSize(FontSize.SM)
+              .fontColor(this.colors.textSecondary)
           }
         }
       }
       .width('100%')
     }
     .width('100%')
-    .padding(16)
-    .backgroundColor('#FFFFFF')
-    .border({ width: { bottom: 1 }, color: BORDER_COLOR })
-    .onClick(() => {
-      router.pushUrl({
-        url: 'pages/IssueDetailPage',
-        params: {
-          owner: this.owner,
-          repo: this.repoName,
-          issueNumber: issue.number
-        }
-      });
+    .padding(Spacing.MD)
+    .backgroundColor(this.selectedIssue?.id === issue.id ? this.colors.bgTertiary : this.colors.surface)
+    .borderRadius(BorderRadius.MD)
+    .border({
+      width: this.selectedIssue?.id === issue.id ? 1 : 0,
+      color: this.colors.brandPrimary
+    })
+    .onClick((): void => {
+      this.handleIssueClick(issue);
     })
   }
 
-  build() {
-    Column() {
-      // 顶部导航栏
-      Row() {
-        Row() {
-          Image($r('app.media.ic_back'))
-            .width(24)
-            .height(24)
-            .fillColor(PRIMARY_TEXT)
-        }
+  // 加载状态
+  @Builder
+  LoadingView() {
+    Column({ space: Spacing.SM }) {
+      LoadingProgress()
         .width(40)
         .height(40)
-        .justifyContent(FlexAlign.Center)
-        .onClick(() => {
-          router.back();
-        })
+        .color(this.colors.brandPrimary)
+      Text($r('app.string.loading'))
+        .fontSize(FontSize.MD)
+        .fontColor(this.colors.textSecondary)
+    }
+    .width('100%')
+    .layoutWeight(1)
+    .justifyContent(FlexAlign.Center)
+  }
 
-        Text('Issues')
-          .fontSize(18)
-          .fontWeight(FontWeight.Medium)
-          .fontColor(PRIMARY_TEXT)
-          .layoutWeight(1)
-
-        // 新建 Issue 按钮
-        Row() {
-          Text('+')
-            .fontSize(24)
-            .fontColor(ACCENT)
+  // 错误状态
+  @Builder
+  ErrorView() {
+    Column({ space: Spacing.SM }) {
+      Text(this.error)
+        .fontSize(FontSize.MD)
+        .fontColor(this.colors.textSecondary)
+      RFButton({
+        text: $r('app.string.retry'),
+        variant: 'secondary',
+        buttonSize: 'md',
+        colors: this.colors,
+        onTap: (): void => {
+          this.loadIssues();
         }
-        .width(40)
-        .height(40)
-        .justifyContent(FlexAlign.Center)
-        .onClick(() => {
-          router.pushUrl({
-            url: 'pages/CreateIssuePage',
-            params: {
-              owner: this.owner,
-              repo: this.repoName
+      })
+        .margin({ top: Spacing.MD })
+    }
+    .width('100%')
+    .layoutWeight(1)
+    .justifyContent(FlexAlign.Center)
+  }
+
+  // 空状态
+  @Builder
+  EmptyView() {
+    Column({ space: Spacing.SM }) {
+      Text('🎉')
+        .fontSize(48)
+      Text(this.filterState === 'open' ? $r('app.string.no_open_issues') : this.filterState === 'closed' ? $r('app.string.no_closed_issues') : $r('app.string.no_issues'))
+        .fontSize(FontSize.MD)
+        .fontColor(this.colors.textSecondary)
+      Text($r('app.string.issue_hint_pr'))
+        .fontSize(FontSize.SM)
+        .fontColor(this.colors.textTertiary)
+        .margin({ top: Spacing.SM })
+    }
+    .width('100%')
+    .layoutWeight(1)
+    .justifyContent(FlexAlign.Center)
+  }
+
+  // Issue 列表
+  @Builder
+  IssueList() {
+    List({ space: Spacing.SM }) {
+      ForEach(this.issues, (issue: GitHubIssue) => {
+        ListItem() {
+          this.IssueCard(issue)
+        }
+      }, (issue: GitHubIssue) => issue.id.toString())
+
+      // 加载更多
+      if (this.hasMore) {
+        ListItem() {
+          Row() {
+            if (this.isLoadingMore) {
+              LoadingProgress()
+                .width(20)
+                .height(20)
+              Text($r('app.string.loading'))
+                .fontSize(FontSize.MD)
+                .fontColor(this.colors.textSecondary)
+                .margin({ left: Spacing.SM })
+            } else {
+              Text($r('app.string.load_more'))
+                .fontSize(FontSize.MD)
+                .fontColor(this.colors.brandPrimary)
             }
-          });
-        })
+          }
+          .width('100%')
+          .height(48)
+          .justifyContent(FlexAlign.Center)
+          .onClick((): void => {
+            if (!this.isLoadingMore) {
+              this.loadIssues(true);
+            }
+          })
+        }
       }
-      .width('100%')
-      .height(56)
-      .padding({ left: 8, right: 8 })
-      .backgroundColor('#FFFFFF')
-      .border({ width: { bottom: 1 }, color: BORDER_COLOR })
+    }
+    .width('100%')
+    .layoutWeight(1)
+    .scrollBar(BarState.Off)
+  }
 
-      // 筛选标签
+  // 列表内容
+  @Builder
+  ListContent() {
+    Column() {
       this.FilterTabs()
 
       if (this.isLoading) {
-        Column() {
-          LoadingProgress()
-            .width(40)
-            .height(40)
-          Text('加载中...')
-            .fontSize(14)
-            .fontColor(SECONDARY_TEXT)
-            .margin({ top: 12 })
-        }
-        .width('100%')
-        .layoutWeight(1)
-        .justifyContent(FlexAlign.Center)
+        this.LoadingView()
       } else if (this.error) {
-        Column() {
-          Text(this.error)
-            .fontSize(14)
-            .fontColor(SECONDARY_TEXT)
-          Button('重试')
-            .height(36)
-            .fontSize(14)
-            .margin({ top: 16 })
-            .onClick(() => this.loadIssues())
-        }
-        .width('100%')
-        .layoutWeight(1)
-        .justifyContent(FlexAlign.Center)
+        this.ErrorView()
       } else if (this.issues.length === 0) {
-        Column() {
-          Text('🎉')
-            .fontSize(48)
-          Text(this.filterState === 'open' ? '没有开放的 Issue' : this.filterState === 'closed' ? '没有已关闭的 Issue' : '没有 Issue')
-            .fontSize(14)
-            .fontColor(SECONDARY_TEXT)
-            .margin({ top: 12 })
-          Text('提示：GitHub 的 Issue 数量统计包含 PR')
-            .fontSize(12)
-            .fontColor('#999999')
-            .margin({ top: 8 })
-            .fontColor(SECONDARY_TEXT)
-            .margin({ top: 12 })
-        }
-        .width('100%')
-        .layoutWeight(1)
-        .justifyContent(FlexAlign.Center)
+        this.EmptyView()
       } else {
-        List() {
-          ForEach(this.issues, (issue: GitHubIssue) => {
-            ListItem() {
-              this.IssueItem(issue)
-            }
-          }, (issue: GitHubIssue) => issue.id.toString())
-
-          // 加载更多
-          if (this.hasMore) {
-            ListItem() {
-              Row() {
-                if (this.isLoadingMore) {
-                  LoadingProgress()
-                    .width(20)
-                    .height(20)
-                  Text('加载中...')
-                    .fontSize(14)
-                    .fontColor(SECONDARY_TEXT)
-                    .margin({ left: 8 })
-                } else {
-                  Text('加载更多')
-                    .fontSize(14)
-                    .fontColor(ACCENT)
-                }
-              }
-              .width('100%')
-              .height(48)
-              .justifyContent(FlexAlign.Center)
-              .onClick(() => {
-                if (!this.isLoadingMore) {
-                  this.loadIssues(true);
-                }
-              })
-            }
-          }
+        Column() {
+          this.IssueList()
         }
         .width('100%')
         .layoutWeight(1)
+        .padding({ left: Spacing.MD, right: Spacing.MD, top: Spacing.SM })
       }
     }
     .width('100%')
     .height('100%')
-    .backgroundColor(CARD_BG)
+  }
+
+  // 详情面板
+  @Builder
+  DetailPanel() {
+    if (this.selectedIssue) {
+      Column({ space: Spacing.MD }) {
+        // 状态标签
+        Row() {
+          Text(this.selectedIssue.state === 'open' ? $r('app.string.issue_state_open') : $r('app.string.issue_state_closed'))
+            .fontSize(FontSize.SM)
+            .fontColor('#FFFFFF')
+            .padding({ left: 10, right: 10, top: 4, bottom: 4 })
+            .borderRadius(12)
+            .backgroundColor(this.selectedIssue.state === 'open' ? this.colors.githubOpen : this.colors.githubClosed)
+        }
+
+        // 标题
+        Text(this.selectedIssue.title)
+          .fontSize(FontSize.XL)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(this.colors.textPrimary)
+
+        // 作者信息
+        Row({ space: Spacing.SM }) {
+          Image(this.selectedIssue.user.avatar_url)
+            .width(24)
+            .height(24)
+            .borderRadius(12)
+          Text(`${this.selectedIssue.user.login} · #${this.selectedIssue.number}`)
+            .fontSize(FontSize.MD)
+            .fontColor(this.colors.textSecondary)
+        }
+
+        // 标签
+        if (this.selectedIssue.labels && this.selectedIssue.labels.length > 0) {
+          Flex({ wrap: FlexWrap.Wrap }) {
+            ForEach(this.selectedIssue.labels, (label: GitHubLabel) => {
+              Text(label.name)
+                .fontSize(11)
+                .fontColor(this.isLightColor(this.getLabelColor(label.color)) ? '#1F2328' : '#FFFFFF')
+                .backgroundColor(this.getLabelColor(label.color))
+                .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+                .borderRadius(10)
+                .margin({ right: 6, bottom: 6 })
+            }, (label: GitHubLabel) => label.id.toString())
+          }
+          .width('100%')
+        }
+
+        // 使用 Spacer 推动按钮到底部
+        Column()
+          .layoutWeight(1)
+
+        // 查看详情按钮
+        RFButton({
+          text: $r('app.string.view_full_details'),
+          variant: 'primary',
+          buttonSize: 'lg',
+          fullWidth: true,
+          colors: this.colors,
+          onTap: (): void => {
+            router.pushUrl({
+              url: 'pages/IssueDetailPage',
+              params: {
+                owner: this.owner,
+                repo: this.repoName,
+                issueNumber: this.selectedIssue!.number
+              }
+            });
+          }
+        })
+      }
+      .width('100%')
+      .height('100%')
+      .padding(Spacing.LG)
+      .backgroundColor(this.colors.bgPrimary)
+    } else {
+      Column({ space: Spacing.SM }) {
+        Image($r('app.media.ic_issue_open'))
+          .width(64)
+          .height(64)
+          .fillColor(this.colors.textTertiary)
+          .opacity(0.5)
+        Text($r('app.string.select_issue_to_view'))
+          .fontSize(FontSize.MD)
+          .fontColor(this.colors.textSecondary)
+      }
+      .width('100%')
+      .height('100%')
+      .justifyContent(FlexAlign.Center)
+    }
+  }
+
+  // =====================================================
+  // 主构建方法
+  // =====================================================
+
+  build() {
+    Column() {
+      // 页面头部
+      this.PageHeader()
+
+      // 内容区域
+      if (this.layoutMode === LayoutMode.SINGLE) {
+        this.ListContent()
+      } else {
+        RFSplitView({
+          layoutMode: this.layoutMode,
+          primaryWidth: this.layoutMode === LayoutMode.TRIPLE ? 360 : 400,
+          colors: this.colors,
+          showDivider: true,
+          primaryContent: (): void => this.ListContent(),
+          detailContent: (): void => this.DetailPanel()
+        })
+      }
+    }
+    .width('100%')
+    .height('100%')
+    .backgroundColor(this.colors.bgSecondary)
   }
 }

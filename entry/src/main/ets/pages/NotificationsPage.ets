@@ -1,26 +1,80 @@
+/**
+ * 通知页面
+ * 
+ * 功能:
+ * - 显示 GitHub 通知列表
+ * - 标记已读
+ * - 支持响应式布局和主题切换
+ */
+
 import router from '@ohos.router';
 import { userState } from '../common/state/UserState';
 import { authManager } from '../services/AuthManager';
 import { GitHubNotification } from '../models/GitHubModels';
 import { LoginPrompt } from '../components/LoginPrompt';
+import {
+  ThemeManager,
+  ThemeColors,
+  ResponsiveManager,
+  ResponsiveState,
+  Spacing,
+  BorderRadius,
+  FontSize,
+  LayoutMode,
+  DeviceType,
+} from '../theme';
+import {
+  RFCard,
+  RFButton,
+  RFSplitView,
+} from '../components';
 
-const PRIMARY_TEXT = '#1F2328';
-const SECONDARY_TEXT = '#656D76';
-const CARD_BG = '#F6F8FA';
-const ACCENT = '#0969DA';
-const ICON_COLOR = '#57606A';
-
+// =====================================================
+// 通知页面
+// =====================================================
 @Component
 export default struct NotificationsPage {
+  // 数据状态
   @State isLoggedIn: boolean = false;
   @State notifications: GitHubNotification[] = [];
   @State isLoading: boolean = false;
   @State showLoginPrompt: boolean = true;
+  @State selectedNotification: GitHubNotification | null = null;
+
+  // 主题状态
+  @State colors: ThemeColors = ThemeManager.colors;
+  @State isDark: boolean = ThemeManager.isDark;
+
+  // 响应式状态
+  @State layoutMode: LayoutMode = ResponsiveManager.state.layoutMode;
+  @State deviceType: DeviceType = ResponsiveManager.state.deviceType;
+
+  private t(res: Resource, ...args: Array<string | number>): string {
+    const rm = getContext(this).resourceManager;
+    return rm.getStringSync(res.id, ...args);
+  }
+
+  // =====================================================
+  // 生命周期
+  // =====================================================
 
   aboutToAppear(): void {
     this.syncState();
-    userState.addListener(() => {
+
+    userState.addListener((): void => {
       this.syncState();
+    });
+
+    // 订阅主题变化
+    ThemeManager.subscribe((colors: ThemeColors, isDark: boolean): void => {
+      this.colors = colors;
+      this.isDark = isDark;
+    });
+
+    // 订阅响应式变化
+    ResponsiveManager.subscribe((state: ResponsiveState): void => {
+      this.layoutMode = state.layoutMode;
+      this.deviceType = state.deviceType;
     });
   }
 
@@ -31,13 +85,19 @@ export default struct NotificationsPage {
     }
   }
 
+  // =====================================================
+  // 数据加载
+  // =====================================================
+
   async loadNotifications(): Promise<void> {
     const api = authManager.getGitHubApi();
     if (!api) return;
 
     this.isLoading = true;
     try {
-      this.notifications = await api.getNotifications(false, 1, 50);
+      // 获取所有通知（包括已读的），而不仅是未读的
+      this.notifications = await api.getNotifications(true, 1, 50);
+      console.info('Loaded notifications:', this.notifications.length);
     } catch (error) {
       console.error('Failed to load notifications:', JSON.stringify(error));
     } finally {
@@ -45,155 +105,26 @@ export default struct NotificationsPage {
     }
   }
 
-  build() {
-    Column() {
-      if (!this.isLoggedIn && this.showLoginPrompt) {
-        LoginPrompt({
-          title: '查看通知',
-          subtitle: '登录后可以接收 Issue、PR 和讨论的通知提醒',
-          onDismiss: () => {
-            this.showLoginPrompt = false;
-          }
-        })
-      } else if (!this.isLoggedIn) {
-        Column({ space: 16 }) {
-          Image($r('app.media.ic_bell'))
-            .width(48)
-            .height(48)
-            .fillColor(SECONDARY_TEXT)
-          Text('通知')
-            .fontSize(20)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(PRIMARY_TEXT)
-          Text('登录后查看您的通知')
-            .fontSize(14)
-            .fontColor(SECONDARY_TEXT)
-        }
-        .width('100%')
-        .height('100%')
-        .justifyContent(FlexAlign.Center)
-        .alignItems(HorizontalAlign.Center)
-      } else {
-        Column() {
-          Row() {
-            Text('通知')
-              .fontSize(20)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(PRIMARY_TEXT)
-            Blank()
-            Text('刷新')
-              .fontSize(14)
-              .fontColor(ACCENT)
-              .onClick(() => {
-                this.loadNotifications();
-              })
-          }
-          .width('100%')
-          .margin({ bottom: 16 })
+  async markAsRead(threadId: string): Promise<void> {
+    const api = authManager.getGitHubApi();
+    if (!api) return;
 
-          if (this.isLoading) {
-            Column() {
-              LoadingProgress()
-                .width(40)
-                .height(40)
-              Text('加载中...')
-                .fontSize(14)
-                .fontColor(SECONDARY_TEXT)
-                .margin({ top: 12 })
-            }
-            .width('100%')
-            .layoutWeight(1)
-            .justifyContent(FlexAlign.Center)
-          } else if (this.notifications.length === 0) {
-            Column({ space: 12 }) {
-              Image($r('app.media.ic_check_circle'))
-                .width(48)
-                .height(48)
-                .fillColor('#1A7F37')
-              Text('没有未读通知 🎉')
-                .fontSize(18)
-                .fontWeight(FontWeight.Medium)
-                .fontColor(PRIMARY_TEXT)
-              Text('您的通知都已处理完毕')
-                .fontSize(14)
-                .fontColor(SECONDARY_TEXT)
-              Button('刷新')
-                .fontSize(14)
-                .fontColor(ACCENT)
-                .backgroundColor('#F0F6FC')
-                .borderRadius(20)
-                .padding({ left: 24, right: 24, top: 10, bottom: 10 })
-                .margin({ top: 16 })
-                .onClick(() => {
-                  this.loadNotifications();
-                })
-            }
-            .width('100%')
-            .layoutWeight(1)
-            .justifyContent(FlexAlign.Center)
-          } else {
-            List({ space: 12 }) {
-              ForEach(this.notifications, (notification: GitHubNotification) => {
-                ListItem() {
-                  this.NotificationCard(notification)
-                }
-              }, (notification: GitHubNotification) => notification.id)
-            }
-            .width('100%')
-            .layoutWeight(1)
-            .scrollBar(BarState.Off)
-          }
-        }
-        .width('100%')
-        .height('100%')
-        .padding(20)
+    try {
+      await api.markNotificationAsRead(threadId);
+      const index = this.notifications.findIndex((n: GitHubNotification): boolean => n.id === threadId);
+      if (index >= 0) {
+        this.notifications[index].unread = false;
+        this.notifications = [...this.notifications];
       }
+    } catch (error) {
+      console.error('Mark as read failed:', JSON.stringify(error));
     }
-    .width('100%')
-    .height('100%')
-    .backgroundColor('#FFFFFF')
   }
 
-  @Builder
-  NotificationCard(notification: GitHubNotification) {
-    Column({ space: 6 }) {
-      Row() {
-        Image(this.getTypeIcon(notification.subject.type))
-          .width(16)
-          .height(16)
-          .fillColor(this.getTypeColor(notification.subject.type))
-        Text(notification.repository.full_name)
-          .fontSize(14)
-          .fontWeight(FontWeight.Medium)
-          .fontColor(PRIMARY_TEXT)
-          .margin({ left: 8 })
-          .layoutWeight(1)
-          .maxLines(1)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-        if (notification.unread) {
-          Circle({ width: 8, height: 8 })
-            .fill(ACCENT)
-        }
-      }
-      .width('100%')
-
-      Text(notification.subject.title)
-        .fontSize(14)
-        .fontColor(SECONDARY_TEXT)
-        .maxLines(2)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
-
-      Text(this.formatTime(notification.updated_at))
-        .fontSize(12)
-        .fontColor(SECONDARY_TEXT)
-        .margin({ top: 4 })
-    }
-    .width('100%')
-    .padding(16)
-    .backgroundColor(notification.unread ? '#F0F6FC' : CARD_BG)
-    .borderRadius(12)
-    .onClick(() => {
-      // 跳转到对应仓库
+  handleNotificationClick(notification: GitHubNotification): void {
+    if (this.layoutMode !== LayoutMode.SINGLE) {
+      this.selectedNotification = notification;
+    } else {
       router.pushUrl({
         url: 'pages/RepoDetailPage',
         params: {
@@ -201,30 +132,15 @@ export default struct NotificationsPage {
           repo: notification.repository.name
         }
       });
-      // 标记为已读
-      if (notification.unread) {
-        this.markAsRead(notification.id);
-      }
-    })
-  }
-
-  async markAsRead(threadId: string): Promise<void> {
-    const api = authManager.getGitHubApi();
-    if (!api) return;
-    
-    try {
-      await api.markNotificationAsRead(threadId);
-      // 更新本地状态
-      const index = this.notifications.findIndex(n => n.id === threadId);
-      if (index >= 0) {
-        this.notifications[index].unread = false;
-        // 触发重新渲染
-        this.notifications = [...this.notifications];
-      }
-    } catch (error) {
-      console.error('Mark as read failed:', JSON.stringify(error));
+    }
+    if (notification.unread) {
+      this.markAsRead(notification.id);
     }
   }
+
+  // =====================================================
+  // 工具方法
+  // =====================================================
 
   getTypeIcon(type: string): Resource {
     switch (type) {
@@ -244,15 +160,15 @@ export default struct NotificationsPage {
   getTypeColor(type: string): string {
     switch (type) {
       case 'Issue':
-        return '#1A7F37';
+        return this.colors.success;
       case 'PullRequest':
-        return '#8250DF';
+        return this.colors.syntaxKeyword;
       case 'Release':
-        return '#0969DA';
+        return this.colors.brandPrimary;
       case 'Discussion':
-        return '#BF8700';
+        return this.colors.warning;
       default:
-        return ICON_COLOR;
+        return this.colors.textTertiary;
     }
   }
 
@@ -265,16 +181,312 @@ export default struct NotificationsPage {
       const days = Math.floor(hours / 24);
 
       if (hours < 1) {
-        return '刚刚';
+        return this.t($r('app.string.notifications_just_now'));
       } else if (hours < 24) {
-        return hours + ' 小时前';
+        return this.t($r('app.string.hours_ago'), hours);
       } else if (days < 7) {
-        return days + ' 天前';
+        return this.t($r('app.string.days_ago'), days);
       } else {
-        return (date.getMonth() + 1) + '月' + date.getDate() + '日';
+        const month = date.getMonth() + 1;
+        const day = date.getDate();
+        return this.t($r('app.string.date_md'), month, day);
       }
     } catch (e) {
       return '';
     }
+  }
+
+  // =====================================================
+  // UI 构建器
+  // =====================================================
+
+  // 页面头部
+  @Builder
+  PageHeader() {
+    Row() {
+      Text($r('app.string.notif_title'))
+        .fontSize(FontSize.XL)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(this.colors.textPrimary)
+      Blank()
+      Text($r('app.string.refresh'))
+        .fontSize(FontSize.MD)
+        .fontColor(this.colors.brandPrimary)
+        .onClick((): void => {
+          this.loadNotifications();
+        })
+    }
+    .width('100%')
+    .height(56)
+    .padding({ left: Spacing.LG, right: Spacing.LG })
+  }
+
+  // 通知卡片
+  @Builder
+  NotificationCard(notification: GitHubNotification) {
+    Column({ space: Spacing.XS }) {
+      Row() {
+        Image(this.getTypeIcon(notification.subject.type))
+          .width(18)
+          .height(18)
+          .fillColor(this.getTypeColor(notification.subject.type))
+
+        Text(notification.repository.full_name)
+          .fontSize(FontSize.MD)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(this.colors.textPrimary)
+          .margin({ left: Spacing.XS })
+          .layoutWeight(1)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+
+        if (notification.unread) {
+          Circle({ width: 8, height: 8 })
+            .fill(this.colors.brandPrimary)
+        }
+      }
+      .width('100%')
+
+      Text(notification.subject.title)
+        .fontSize(FontSize.MD)
+        .fontColor(this.colors.textSecondary)
+        .maxLines(2)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+
+      Text(this.formatTime(notification.updated_at))
+        .fontSize(FontSize.SM)
+        .fontColor(this.colors.textTertiary)
+        .margin({ top: Spacing.XXS })
+    }
+    .width('100%')
+    .padding(Spacing.MD)
+    .backgroundColor(notification.unread
+      ? this.colors.primaryContainer
+      : (this.selectedNotification?.id === notification.id ? this.colors.bgTertiary : this.colors.surface))
+    .borderRadius(BorderRadius.MD)
+    .border({
+      width: this.selectedNotification?.id === notification.id ? 1 : 0,
+      color: this.colors.brandPrimary
+    })
+    .onClick((): void => {
+      this.handleNotificationClick(notification);
+    })
+  }
+
+  // 加载状态
+  @Builder
+  LoadingView() {
+    Column({ space: Spacing.SM }) {
+      LoadingProgress()
+        .width(40)
+        .height(40)
+        .color(this.colors.brandPrimary)
+      Text($r('app.string.loading'))
+        .fontSize(FontSize.MD)
+        .fontColor(this.colors.textSecondary)
+    }
+    .width('100%')
+    .layoutWeight(1)
+    .justifyContent(FlexAlign.Center)
+  }
+
+  // 空状态
+  @Builder
+  EmptyView() {
+    Column({ space: Spacing.SM }) {
+      Image($r('app.media.ic_check_circle'))
+        .width(48)
+        .height(48)
+        .fillColor(this.colors.success)
+      Text($r('app.string.no_notifications'))
+        .fontSize(FontSize.LG)
+        .fontWeight(FontWeight.Medium)
+        .fontColor(this.colors.textPrimary)
+      RFButton({
+        text: $r('app.string.refresh'),
+        variant: 'secondary',
+        buttonSize: 'md',
+        colors: this.colors,
+        onTap: (): void => {
+          this.loadNotifications();
+        }
+      })
+        .margin({ top: Spacing.MD })
+    }
+    .width('100%')
+    .layoutWeight(1)
+    .justifyContent(FlexAlign.Center)
+  }
+
+  // 通知列表
+  @Builder
+  NotificationList() {
+    List({ space: Spacing.SM }) {
+      ForEach(this.notifications, (notification: GitHubNotification) => {
+        ListItem() {
+          this.NotificationCard(notification)
+        }
+      }, (notification: GitHubNotification) => notification.id)
+    }
+    .width('100%')
+    .layoutWeight(1)
+    .scrollBar(BarState.Off)
+  }
+
+  // 列表内容
+  @Builder
+  ListContent() {
+    Column() {
+      if (this.isLoading) {
+        this.LoadingView()
+      } else if (this.notifications.length === 0) {
+        this.EmptyView()
+      } else {
+        this.NotificationList()
+      }
+    }
+    .width('100%')
+    .height('100%')
+    .padding({ left: Spacing.MD, right: Spacing.MD, bottom: Spacing.MD })
+  }
+
+  // 详情面板
+  @Builder
+  DetailPanel() {
+    if (this.selectedNotification) {
+      Column({ space: Spacing.LG }) {
+        // 通知类型图标
+        Row({ space: Spacing.SM }) {
+          Image(this.getTypeIcon(this.selectedNotification.subject.type))
+            .width(24)
+            .height(24)
+            .fillColor(this.getTypeColor(this.selectedNotification.subject.type))
+          Text(this.selectedNotification.subject.type)
+            .fontSize(FontSize.MD)
+            .fontColor(this.colors.textSecondary)
+        }
+
+        // 标题
+        Text(this.selectedNotification.subject.title)
+          .fontSize(FontSize.XL)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(this.colors.textPrimary)
+
+        // 仓库信息
+        Row({ space: Spacing.SM }) {
+          Image($r('app.media.ic_repo'))
+            .width(16)
+            .height(16)
+            .fillColor(this.colors.textSecondary)
+          Text(this.selectedNotification.repository.full_name)
+            .fontSize(FontSize.MD)
+            .fontColor(this.colors.brandPrimary)
+        }
+
+        // 时间
+        Text(this.formatTime(this.selectedNotification.updated_at))
+          .fontSize(FontSize.SM)
+          .fontColor(this.colors.textTertiary)
+
+        // 查看按钮 - 紧跟内容
+        RFButton({
+          text: $r('app.string.view_details'),
+          variant: 'primary',
+          buttonSize: 'lg',
+          fullWidth: true,
+          colors: this.colors,
+          onTap: (): void => {
+            router.pushUrl({
+              url: 'pages/RepoDetailPage',
+              params: {
+                owner: this.selectedNotification!.repository.owner.login,
+                repo: this.selectedNotification!.repository.name
+              }
+            });
+          }
+        })
+      }
+      .width('100%')
+      .padding(Spacing.LG)
+      .alignItems(HorizontalAlign.Start)
+      .backgroundColor(this.colors.bgPrimary)
+    } else {
+      Column({ space: Spacing.SM }) {
+        Image($r('app.media.ic_bell'))
+          .width(64)
+          .height(64)
+          .fillColor(this.colors.textTertiary)
+          .opacity(0.5)
+        Text($r('app.string.select_notification'))
+          .fontSize(FontSize.MD)
+          .fontColor(this.colors.textSecondary)
+      }
+      .width('100%')
+      .height('100%')
+      .justifyContent(FlexAlign.Center)
+    }
+  }
+
+  // 未登录视图
+  @Builder
+  NotLoggedInView() {
+    Column({ space: Spacing.MD }) {
+      Image($r('app.media.ic_bell'))
+        .width(48)
+        .height(48)
+        .fillColor(this.colors.textSecondary)
+      Text($r('app.string.notif_title'))
+        .fontSize(FontSize.XL)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(this.colors.textPrimary)
+      Text($r('app.string.notif_login_hint'))
+        .fontSize(FontSize.MD)
+        .fontColor(this.colors.textSecondary)
+    }
+    .width('100%')
+    .height('100%')
+    .justifyContent(FlexAlign.Center)
+    .alignItems(HorizontalAlign.Center)
+  }
+
+  // =====================================================
+  // 主构建方法
+  // =====================================================
+
+  build() {
+    Column() {
+      if (!this.isLoggedIn && this.showLoginPrompt) {
+        // 未登录提示
+        LoginPrompt({
+          title: $r('app.string.view_notifications'),
+          subtitle: $r('app.string.login_to_view_notifications'),
+          onDismiss: (): void => {
+            this.showLoginPrompt = false;
+          }
+        })
+      } else if (!this.isLoggedIn) {
+        this.NotLoggedInView()
+      } else {
+        // 页面头部
+        this.PageHeader()
+
+        // 内容区域
+        if (this.layoutMode === LayoutMode.SINGLE) {
+          this.ListContent()
+        } else {
+          RFSplitView({
+            layoutMode: this.layoutMode,
+            primaryWidth: this.layoutMode === LayoutMode.TRIPLE ? 360 : 400,
+            colors: this.colors,
+            showDivider: true,
+            primaryContent: (): void => this.ListContent(),
+            detailContent: (): void => this.DetailPanel()
+          })
+        }
+      }
+    }
+    .width('100%')
+    .height('100%')
+    .backgroundColor(this.colors.bgPrimary)
   }
 }

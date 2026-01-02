@@ -1,39 +1,44 @@
+/**
+ * 个人资料页面
+ * 
+ * 功能:
+ * - 用户信息展示
+ * - 热门仓库
+ * - 最近活动
+ * - Star 的仓库
+ * - 组织信息
+ * - 语言统计
+ * - 支持响应式布局和主题切换
+ */
+
 import router from '@ohos.router';
 import { authManager } from '../services/AuthManager';
 import { userState } from '../common/state/UserState';
 import { tabState } from '../common/state/TabState';
 import { GitHubUser, GitHubRepo, GitHubEvent, GitHubOrg } from '../models/GitHubModels';
+import {
+  ThemeManager,
+  ThemeColors,
+  ResponsiveManager,
+  ResponsiveState,
+  getLanguageColor,
+  Spacing,
+  BorderRadius,
+  FontSize,
+  LayoutMode,
+  DeviceType,
+} from '../theme';
+import {
+  RFCard,
+  RFButton,
+  RFAvatar,
+  RFSplitView,
+  RFPageHeader,
+} from '../components';
 
-const PRIMARY_TEXT = '#1F2328';
-const SECONDARY_TEXT = '#656D76';
-const CARD_BG = '#F6F8FA';
-const ACCENT = '#0969DA';
-const ICON_COLOR = '#57606A';
-
-// 语言颜色映射
-const LANGUAGE_COLORS: Record<string, string> = {
-  'TypeScript': '#3178C6',
-  'JavaScript': '#F7DF1E',
-  'Python': '#3776AB',
-  'Java': '#B07219',
-  'Go': '#00ADD8',
-  'Rust': '#DEA584',
-  'C++': '#F34B7D',
-  'C': '#555555',
-  'Swift': '#FA7343',
-  'Kotlin': '#A97BFF',
-  'Ruby': '#CC342D',
-  'PHP': '#777BB4',
-  'C#': '#239120',
-  'Dart': '#00B4AB',
-  'Shell': '#89E051',
-  'HTML': '#E34C26',
-  'CSS': '#563D7C',
-  'Vue': '#41B883',
-  'Scala': '#C22D40',
-  'Lua': '#000080'
-};
-
+// =====================================================
+// 类型定义
+// =====================================================
 interface LanguageStat {
   name: string;
   count: number;
@@ -41,8 +46,12 @@ interface LanguageStat {
   color: string;
 }
 
+// =====================================================
+// 个人资料页面
+// =====================================================
 @Component
 export default struct ProfilePage {
+  // 数据状态
   @State isLoggedIn: boolean = false;
   @State isLoading: boolean = false;
   @State user: GitHubUser | null = null;
@@ -56,10 +65,40 @@ export default struct ProfilePage {
   @State loadingStarred: boolean = false;
   @State loadingOrgs: boolean = false;
 
+  private t(res: Resource, ...args: Array<string | number>): string {
+    const rm = getContext(this).resourceManager;
+    return rm.getStringSync(res.id, ...args);
+  }
+
+  // 主题状态
+  @State colors: ThemeColors = ThemeManager.colors;
+  @State isDark: boolean = ThemeManager.isDark;
+
+  // 响应式状态
+  @State layoutMode: LayoutMode = ResponsiveManager.state.layoutMode;
+  @State deviceType: DeviceType = ResponsiveManager.state.deviceType;
+
+  // =====================================================
+  // 生命周期
+  // =====================================================
+
   aboutToAppear(): void {
     this.syncState();
-    userState.addListener(() => {
+
+    userState.addListener((): void => {
       this.syncState();
+    });
+
+    // 订阅主题变化
+    ThemeManager.subscribe((colors: ThemeColors, isDark: boolean): void => {
+      this.colors = colors;
+      this.isDark = isDark;
+    });
+
+    // 订阅响应式变化
+    ResponsiveManager.subscribe((state: ResponsiveState): void => {
+      this.layoutMode = state.layoutMode;
+      this.deviceType = state.deviceType;
     });
   }
 
@@ -71,7 +110,7 @@ export default struct ProfilePage {
     this.isLoggedIn = userState.isLoggedIn;
     this.isLoading = userState.isLoading;
     this.user = userState.user;
-    
+
     if (this.isLoggedIn && this.user && this.pinnedRepos.length === 0) {
       this.loadPinnedRepos();
       this.loadRecentActivity();
@@ -79,6 +118,10 @@ export default struct ProfilePage {
       this.loadOrganizations();
     }
   }
+
+  // =====================================================
+  // 数据加载
+  // =====================================================
 
   async loadPinnedRepos(): Promise<void> {
     const api = authManager.getGitHubApi();
@@ -88,7 +131,6 @@ export default struct ProfilePage {
     try {
       const repos = await api.getUserRepos(1, 6);
       this.pinnedRepos = repos;
-      // 计算语言统计
       this.calculateLanguageStats(repos);
     } catch (error) {
       console.error('Failed to load repos:', JSON.stringify(error));
@@ -100,27 +142,26 @@ export default struct ProfilePage {
   calculateLanguageStats(repos: GitHubRepo[]): void {
     const langCount: Record<string, number> = {};
     let total = 0;
-    
+
     for (const repo of repos) {
       if (repo.language) {
         langCount[repo.language] = (langCount[repo.language] || 0) + 1;
         total++;
       }
     }
-    
+
     const stats: LanguageStat[] = [];
     for (const lang of Object.keys(langCount)) {
       stats.push({
         name: lang,
         count: langCount[lang],
         percentage: Math.round((langCount[lang] / total) * 100),
-        color: LANGUAGE_COLORS[lang] || '#8B8B8B'
+        color: getLanguageColor(lang)
       });
     }
-    
-    // 按数量排序
-    stats.sort((a, b) => b.count - a.count);
-    this.languageStats = stats.slice(0, 5); // 只取前5个
+
+    stats.sort((a: LanguageStat, b: LanguageStat): number => b.count - a.count);
+    this.languageStats = stats.slice(0, 5);
   }
 
   async loadRecentActivity(): Promise<void> {
@@ -176,515 +217,38 @@ export default struct ProfilePage {
     }
   }
 
-  build() {
-    Column() {
-      // 顶部标题栏
-      Row() {
-        Text('个人资料')
-          .fontSize(20)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(PRIMARY_TEXT)
-        Blank()
-        Row() {
-          Image($r('app.media.ic_settings'))
-            .width(22)
-            .height(22)
-            .fillColor(ICON_COLOR)
-        }
-        .width(40)
-        .height(40)
-        .justifyContent(FlexAlign.Center)
-        .onClick(() => {
-          router.pushUrl({ url: 'pages/SettingsPage' });
-        })
-      }
-      .width('100%')
-      .height(56)
-      .padding({ left: 20, right: 12 })
+  // =====================================================
+  // 工具方法
+  // =====================================================
 
-      Scroll() {
-        Column({ space: 16 }) {
-          if (this.isLoading) {
-            Row({ space: 12 }) {
-              LoadingProgress()
-                .width(32)
-                .height(32)
-                .color(ACCENT)
-              Text('加载中...')
-                .fontSize(14)
-                .fontColor(SECONDARY_TEXT)
-            }
-            .width('100%')
-            .justifyContent(FlexAlign.Center)
-            .padding({ top: 40, bottom: 40 })
-          } else if (this.isLoggedIn && this.user) {
-            // 用户信息卡片
-            Column({ space: 16 }) {
-              Row({ space: 16 }) {
-                Image(this.user.avatar_url)
-                  .width(72)
-                  .height(72)
-                  .borderRadius(36)
-                  .border({ width: 3, color: ACCENT })
-                
-                Column({ space: 4 }) {
-                  Text(this.user.name || this.user.login)
-                    .fontSize(22)
-                    .fontWeight(FontWeight.Bold)
-                    .fontColor(PRIMARY_TEXT)
-                  
-                  Text(`@${this.user.login}`)
-                    .fontSize(14)
-                    .fontColor(SECONDARY_TEXT)
-                  
-                  if (this.user.bio) {
-                    Text(this.user.bio)
-                      .fontSize(13)
-                      .fontColor(SECONDARY_TEXT)
-                      .maxLines(2)
-                      .textOverflow({ overflow: TextOverflow.Ellipsis })
-                      .margin({ top: 4 })
-                  }
-                }
-                .alignItems(HorizontalAlign.Start)
-                .layoutWeight(1)
-              }
-              .width('100%')
-
-              if (this.user.company || this.user.location || this.user.blog) {
-                Column({ space: 8 }) {
-                  if (this.user.company) {
-                    Row({ space: 8 }) {
-                      Image($r('app.media.ic_company'))
-                        .width(16)
-                        .height(16)
-                        .fillColor(ICON_COLOR)
-                      Text(this.user.company)
-                        .fontSize(13)
-                        .fontColor(SECONDARY_TEXT)
-                    }
-                  }
-                  if (this.user.location) {
-                    Row({ space: 8 }) {
-                      Image($r('app.media.ic_location'))
-                        .width(16)
-                        .height(16)
-                        .fillColor(ICON_COLOR)
-                      Text(this.user.location)
-                        .fontSize(13)
-                        .fontColor(SECONDARY_TEXT)
-                    }
-                  }
-                  if (this.user.blog) {
-                    Row({ space: 8 }) {
-                      Image($r('app.media.ic_link'))
-                        .width(16)
-                        .height(16)
-                        .fillColor(ICON_COLOR)
-                      Text(this.user.blog)
-                        .fontSize(13)
-                        .fontColor(ACCENT)
-                        .maxLines(1)
-                        .textOverflow({ overflow: TextOverflow.Ellipsis })
-                    }
-                  }
-                }
-                .width('100%')
-                .alignItems(HorizontalAlign.Start)
-                .padding({ top: 8 })
-              }
-
-              // 统计信息
-              Row() {
-                this.ClickableStatItem(this.user.public_repos, '公开仓库', () => {
-                  tabState.switchToRepos();
-                })
-                Divider().vertical(true).height(32).color('#D0D7DE')
-                this.ClickableStatItem(this.user.followers, '关注者', () => {
-                  router.pushUrl({ 
-                    url: 'pages/FollowListPage',
-                    params: { username: this.user?.login, type: 'followers' }
-                  });
-                })
-                Divider().vertical(true).height(32).color('#D0D7DE')
-                this.ClickableStatItem(this.user.following, '正在关注', () => {
-                  router.pushUrl({ 
-                    url: 'pages/FollowListPage',
-                    params: { username: this.user?.login, type: 'following' }
-                  });
-                })
-              }
-              .width('100%')
-              .justifyContent(FlexAlign.SpaceAround)
-              .padding({ top: 8, bottom: 8 })
-              .backgroundColor('#F0F6FC')
-              .borderRadius(12)
-            }
-            .width('100%')
-            .padding(16)
-            .backgroundColor(CARD_BG)
-            .borderRadius(12)
-
-            // 热门仓库
-            Column({ space: 12 }) {
-              Row() {
-                Text('热门仓库')
-                  .fontSize(16)
-                  .fontWeight(FontWeight.Medium)
-                  .fontColor(PRIMARY_TEXT)
-                Blank()
-                Text('查看全部')
-                  .fontSize(13)
-                  .fontColor(ACCENT)
-              }
-              .width('100%')
-
-              if (this.loadingRepos) {
-                Row() {
-                  LoadingProgress().width(20).height(20)
-                  Text('加载中...')
-                    .fontSize(13)
-                    .fontColor(SECONDARY_TEXT)
-                    .margin({ left: 8 })
-                }
-              } else if (this.pinnedRepos.length === 0) {
-                Text('暂无仓库')
-                  .fontSize(13)
-                  .fontColor(SECONDARY_TEXT)
-              } else {
-                Column({ space: 8 }) {
-                  ForEach(this.pinnedRepos, (repo: GitHubRepo) => {
-                    this.MiniRepoCard(repo)
-                  }, (repo: GitHubRepo) => repo.id.toString())
-                }
-                .width('100%')
-              }
-            }
-            .width('100%')
-            .padding(16)
-            .backgroundColor(CARD_BG)
-            .borderRadius(12)
-            .alignItems(HorizontalAlign.Start)
-
-            // 最近活动
-            Column({ space: 12 }) {
-              Text('最近活动')
-                .fontSize(16)
-                .fontWeight(FontWeight.Medium)
-                .fontColor(PRIMARY_TEXT)
-                .width('100%')
-
-              if (this.loadingActivity) {
-                Row() {
-                  LoadingProgress().width(20).height(20)
-                  Text('加载中...')
-                    .fontSize(13)
-                    .fontColor(SECONDARY_TEXT)
-                    .margin({ left: 8 })
-                }
-              } else if (this.recentActivity.length === 0) {
-                Text('暂无活动')
-                  .fontSize(13)
-                  .fontColor(SECONDARY_TEXT)
-              } else {
-                Column({ space: 0 }) {
-                  ForEach(this.recentActivity.slice(0, 5), (event: GitHubEvent, index: number) => {
-                    this.ActivityItem(event)
-                    if (index < Math.min(this.recentActivity.length, 5) - 1) {
-                      Divider().color('#E1E4E8').margin({ left: 32 })
-                    }
-                  }, (event: GitHubEvent) => event.id)
-                }
-                .width('100%')
-              }
-            }
-            .width('100%')
-            .padding(16)
-            .backgroundColor(CARD_BG)
-            .borderRadius(12)
-            .alignItems(HorizontalAlign.Start)
-
-            // 语言统计
-            if (this.languageStats.length > 0) {
-              Column({ space: 12 }) {
-                Text('语言统计')
-                  .fontSize(16)
-                  .fontWeight(FontWeight.Medium)
-                  .fontColor(PRIMARY_TEXT)
-                  .width('100%')
-
-                // 条形图
-                Column({ space: 8 }) {
-                  // 进度条
-                  Row() {
-                    ForEach(this.languageStats, (stat: LanguageStat) => {
-                      Row()
-                        .width(`${stat.percentage}%`)
-                        .height(8)
-                        .backgroundColor(stat.color)
-                    }, (stat: LanguageStat) => stat.name)
-                  }
-                  .width('100%')
-                  .borderRadius(4)
-                  .clip(true)
-
-                  // 图例
-                  Flex({ wrap: FlexWrap.Wrap }) {
-                    ForEach(this.languageStats, (stat: LanguageStat) => {
-                      Row({ space: 4 }) {
-                        Circle({ width: 10, height: 10 })
-                          .fill(stat.color)
-                        Text(`${stat.name} ${stat.percentage}%`)
-                          .fontSize(12)
-                          .fontColor(SECONDARY_TEXT)
-                      }
-                      .margin({ right: 12, bottom: 6 })
-                    }, (stat: LanguageStat) => stat.name)
-                  }
-                  .width('100%')
-                }
-                .width('100%')
-              }
-              .width('100%')
-              .padding(16)
-              .backgroundColor(CARD_BG)
-              .borderRadius(12)
-              .alignItems(HorizontalAlign.Start)
-            }
-
-            // Star 过的仓库
-            Column({ space: 12 }) {
-              Row() {
-                Text('Star 过的仓库')
-                  .fontSize(16)
-                  .fontWeight(FontWeight.Medium)
-                  .fontColor(PRIMARY_TEXT)
-                Blank()
-                Text('查看全部')
-                  .fontSize(13)
-                  .fontColor(ACCENT)
-                  .onClick(() => {
-                    router.pushUrl({ url: 'pages/StarredReposPage' });
-                  })
-              }
-              .width('100%')
-
-              if (this.loadingStarred) {
-                Row() {
-                  LoadingProgress().width(20).height(20)
-                  Text('加载中...')
-                    .fontSize(13)
-                    .fontColor(SECONDARY_TEXT)
-                    .margin({ left: 8 })
-                }
-              } else if (this.starredRepos.length === 0) {
-                Text('暂无 Star 的仓库')
-                  .fontSize(13)
-                  .fontColor(SECONDARY_TEXT)
-              } else {
-                Column({ space: 8 }) {
-                  ForEach(this.starredRepos, (repo: GitHubRepo) => {
-                    this.MiniRepoCard(repo)
-                  }, (repo: GitHubRepo) => repo.id.toString())
-                }
-                .width('100%')
-              }
-            }
-            .width('100%')
-            .padding(16)
-            .backgroundColor(CARD_BG)
-            .borderRadius(12)
-            .alignItems(HorizontalAlign.Start)
-
-            // 组织
-            Column({ space: 12 }) {
-              Text('组织')
-                .fontSize(16)
-                .fontWeight(FontWeight.Medium)
-                .fontColor(PRIMARY_TEXT)
-                .width('100%')
-
-              if (this.loadingOrgs) {
-                Row() {
-                  LoadingProgress().width(20).height(20)
-                  Text('加载中...')
-                    .fontSize(13)
-                    .fontColor(SECONDARY_TEXT)
-                    .margin({ left: 8 })
-                }
-              } else if (this.organizations.length === 0) {
-                Text('暂未加入任何组织')
-                  .fontSize(13)
-                  .fontColor(SECONDARY_TEXT)
-              } else {
-                Row({ space: 12 }) {
-                  ForEach(this.organizations, (org: GitHubOrg) => {
-                    Column({ space: 4 }) {
-                      Image(org.avatar_url)
-                        .width(48)
-                        .height(48)
-                        .borderRadius(8)
-                      Text(org.login)
-                        .fontSize(11)
-                        .fontColor(SECONDARY_TEXT)
-                        .maxLines(1)
-                        .textOverflow({ overflow: TextOverflow.Ellipsis })
-                        .constraintSize({ maxWidth: 60 })
-                    }
-                    .alignItems(HorizontalAlign.Center)
-                  }, (org: GitHubOrg) => org.id.toString())
-                }
-              }
-            }
-            .width('100%')
-            .padding(16)
-            .backgroundColor(CARD_BG)
-            .borderRadius(12)
-            .alignItems(HorizontalAlign.Start)
-
-          } else {
-            // 未登录状态
-            Column({ space: 20 }) {
-              Image($r('app.media.github_mark'))
-                .width(80)
-                .height(80)
-                .fillColor('#24292F')
-
-              Text('登录 GitHub')
-                .fontSize(24)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(PRIMARY_TEXT)
-
-              Text('登录后可以访问您的仓库、通知、关注列表和个人信息')
-                .fontSize(14)
-                .fontColor(SECONDARY_TEXT)
-                .textAlign(TextAlign.Center)
-                .padding({ left: 20, right: 20 })
-
-              Button() {
-                Row({ space: 8 }) {
-                  Image($r('app.media.github_mark'))
-                    .width(20)
-                    .height(20)
-                    .fillColor('#FFFFFF')
-                  Text('使用 GitHub 登录')
-                    .fontSize(16)
-                    .fontColor('#FFFFFF')
-                }
-              }
-              .width('80%')
-              .height(50)
-              .backgroundColor('#24292F')
-              .borderRadius(8)
-              .margin({ top: 12 })
-              .onClick(() => {
-                this.handleLogin();
-              })
-            }
-            .width('100%')
-            .alignItems(HorizontalAlign.Center)
-            .padding({ top: 60, bottom: 60 })
-          }
-        }
-        .padding(20)
-        .width('100%')
-      }
-      .layoutWeight(1)
+  formatNumber(num: number | undefined): string {
+    if (num === undefined) return '0';
+    if (num >= 1000) {
+      return (num / 1000).toFixed(1) + 'k';
     }
-    .width('100%')
-    .height('100%')
-    .backgroundColor('#FFFFFF')
+    return num.toString();
   }
 
-  @Builder
-  ClickableStatItem(count: number | undefined, label: string, onClick: () => void) {
-    Column({ space: 4 }) {
-      Text((count ?? 0).toString())
-        .fontSize(20)
-        .fontWeight(FontWeight.Bold)
-        .fontColor(PRIMARY_TEXT)
-      Text(label)
-        .fontSize(12)
-        .fontColor(SECONDARY_TEXT)
-    }
-    .alignItems(HorizontalAlign.Center)
-    .padding({ left: 12, right: 12, top: 8, bottom: 8 })
-    .onClick(onClick)
-  }
+  formatTime(dateStr: string): string {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const hours = Math.floor(diff / (1000 * 60 * 60));
 
-  @Builder
-  MiniRepoCard(repo: GitHubRepo) {
-    Row({ space: 10 }) {
-      Image($r('app.media.ic_repo'))
-        .width(16)
-        .height(16)
-        .fillColor(ICON_COLOR)
-      
-      Column({ space: 2 }) {
-        Text(repo.name)
-          .fontSize(14)
-          .fontWeight(FontWeight.Medium)
-          .fontColor(ACCENT)
-          .maxLines(1)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-        
-        if (repo.description) {
-          Text(repo.description)
-            .fontSize(12)
-            .fontColor(SECONDARY_TEXT)
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-        }
+    if (hours < 1) {
+      const minutes = Math.floor(diff / (1000 * 60));
+      return this.t($r('app.string.minutes_ago'), minutes);
+    } else if (hours < 24) {
+      return this.t($r('app.string.hours_ago'), hours);
+    } else {
+      const days = Math.floor(hours / 24);
+      if (days < 30) {
+        return this.t($r('app.string.days_ago'), days);
       }
-      .alignItems(HorizontalAlign.Start)
-      .layoutWeight(1)
-      
-      Row({ space: 4 }) {
-        Image($r('app.media.ic_star'))
-          .width(12)
-          .height(12)
-          .fillColor(ICON_COLOR)
-        Text(this.formatNumber(repo.stargazers_count))
-          .fontSize(12)
-          .fontColor(SECONDARY_TEXT)
-      }
+      const month = date.getMonth() + 1;
+      const day = date.getDate();
+      return this.t($r('app.string.date_md'), month, day);
     }
-    .width('100%')
-    .padding(12)
-    .backgroundColor('#FFFFFF')
-    .borderRadius(8)
-    .onClick(() => {
-      router.pushUrl({
-        url: 'pages/RepoDetailPage',
-        params: { owner: repo.owner.login, repo: repo.name }
-      });
-    })
-  }
-
-  @Builder
-  ActivityItem(event: GitHubEvent) {
-    Row({ space: 10 }) {
-      Image(this.getEventIcon(event.type))
-        .width(18)
-        .height(18)
-        .fillColor(ICON_COLOR)
-      
-      Column({ space: 2 }) {
-        Text(this.getEventDescription(event))
-          .fontSize(13)
-          .fontColor(PRIMARY_TEXT)
-          .maxLines(2)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-        
-        Text(this.formatTime(event.created_at))
-          .fontSize(11)
-          .fontColor(SECONDARY_TEXT)
-      }
-      .alignItems(HorizontalAlign.Start)
-      .layoutWeight(1)
-    }
-    .width('100%')
-    .padding({ top: 10, bottom: 10 })
   }
 
   getEventIcon(type: string): Resource {
@@ -706,53 +270,659 @@ export default struct ProfilePage {
     }
   }
 
-  getEventDescription(event: GitHubEvent): string {
+  getEventDescription(event: GitHubEvent): ResourceStr {
     const repo = event.repo.name;
     switch (event.type) {
       case 'PushEvent':
         const commits = event.payload.size ?? 0;
-        return `推送了 ${commits} 个提交到 ${repo}`;
+        return $r('app.string.push_commits', commits, repo);
       case 'CreateEvent':
         const refType = event.payload.ref_type ?? 'repository';
-        return `创建了 ${refType} 在 ${repo}`;
+        return $r('app.string.create_ref', refType, repo);
       case 'WatchEvent':
-        return `Star 了 ${repo}`;
+        return $r('app.string.starred_repo', repo);
       case 'ForkEvent':
-        return `Fork 了 ${repo}`;
+        return $r('app.string.forked_repo', repo);
       case 'IssuesEvent':
-        return `${event.payload.action ?? '操作'} Issue 在 ${repo}`;
+        return $r('app.string.action_issue', event.payload.action ?? 'action', repo);
       case 'PullRequestEvent':
-        return `${event.payload.action ?? '操作'} PR 在 ${repo}`;
+        return $r('app.string.action_pr', event.payload.action ?? 'action', repo);
       default:
-        return `活动于 ${repo}`;
+        return $r('app.string.event_in_repo', event.type, repo);
     }
   }
 
-  formatNumber(num: number | undefined): string {
-    if (num === undefined) return '0';
-    if (num >= 1000) {
-      return (num / 1000).toFixed(1) + 'k';
-    }
-    return num.toString();
-  }
+  // =====================================================
+  // UI 构建器
+  // =====================================================
 
-  formatTime(dateStr: string): string {
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    
-    if (hours < 1) {
-      const minutes = Math.floor(diff / (1000 * 60));
-      return `${minutes} 分钟前`;
-    } else if (hours < 24) {
-      return `${hours} 小时前`;
-    } else {
-      const days = Math.floor(hours / 24);
-      if (days < 30) {
-        return `${days} 天前`;
+  // 页面头部
+  @Builder
+  PageHeader() {
+    Row() {
+      Text($r('app.string.profile'))
+        .fontSize(FontSize.XL)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(this.colors.textPrimary)
+      Blank()
+      Row() {
+        Image($r('app.media.ic_settings'))
+          .width(22)
+          .height(22)
+          .fillColor(this.colors.textSecondary)
       }
-      return date.toLocaleDateString();
+      .width(40)
+      .height(40)
+      .justifyContent(FlexAlign.Center)
+      .onClick((): void => {
+        router.pushUrl({ url: 'pages/SettingsPage' });
+      })
     }
+    .width('100%')
+    .height(56)
+    .padding({ left: Spacing.LG, right: Spacing.SM })
+  }
+
+  // 用户信息卡片
+  @Builder
+  UserInfoCard() {
+    RFCard({
+      variant: 'filled',
+      colors: this.colors,
+      content: (): void => this.UserInfoContent()
+    })
+  }
+
+  @Builder
+  UserInfoContent() {
+    Column({ space: Spacing.MD }) {
+      // 头像和基本信息
+      Row({ space: Spacing.MD }) {
+        RFAvatar({
+          src: this.user!.avatar_url,
+          avatarSize: 'xxl',
+          colors: this.colors
+        })
+
+        Column({ space: Spacing.XXS }) {
+          Text(this.user!.name || this.user!.login)
+            .fontSize(FontSize.XL)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(this.colors.textPrimary)
+
+          Text(`@${this.user!.login}`)
+            .fontSize(FontSize.MD)
+            .fontColor(this.colors.textSecondary)
+
+          if (this.user!.bio) {
+            Text(this.user!.bio)
+              .fontSize(FontSize.SM)
+              .fontColor(this.colors.textSecondary)
+              .maxLines(2)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+              .margin({ top: Spacing.XXS })
+          }
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
+      }
+      .width('100%')
+
+      // 联系信息
+      if (this.user!.company || this.user!.location || this.user!.blog) {
+        Column({ space: Spacing.XS }) {
+          if (this.user!.company) {
+            Row({ space: Spacing.XS }) {
+              Image($r('app.media.ic_company'))
+                .width(16)
+                .height(16)
+                .fillColor(this.colors.textTertiary)
+              Text(this.user!.company)
+                .fontSize(FontSize.SM)
+                .fontColor(this.colors.textSecondary)
+            }
+          }
+          if (this.user!.location) {
+            Row({ space: Spacing.XS }) {
+              Image($r('app.media.ic_location'))
+                .width(16)
+                .height(16)
+                .fillColor(this.colors.textTertiary)
+              Text(this.user!.location)
+                .fontSize(FontSize.SM)
+                .fontColor(this.colors.textSecondary)
+            }
+          }
+          if (this.user!.blog) {
+            Row({ space: Spacing.XS }) {
+              Image($r('app.media.ic_link'))
+                .width(16)
+                .height(16)
+                .fillColor(this.colors.textTertiary)
+              Text(this.user!.blog)
+                .fontSize(FontSize.SM)
+                .fontColor(this.colors.brandPrimary)
+                .maxLines(1)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
+            }
+          }
+        }
+        .width('100%')
+        .alignItems(HorizontalAlign.Start)
+      }
+
+      // 统计信息
+      Row() {
+        this.StatItem(this.user!.public_repos, $r('app.string.public_repos'), (): void => {
+          tabState.switchToRepos();
+        })
+        Divider().vertical(true).height(32).color(this.colors.divider)
+        this.StatItem(this.user!.followers, $r('app.string.followers'), (): void => {
+          router.pushUrl({
+            url: 'pages/FollowListPage',
+            params: { username: this.user?.login, type: 'followers' }
+          });
+        })
+        Divider().vertical(true).height(32).color(this.colors.divider)
+        this.StatItem(this.user!.following, $r('app.string.following'), (): void => {
+          router.pushUrl({
+            url: 'pages/FollowListPage',
+            params: { username: this.user?.login, type: 'following' }
+          });
+        })
+      }
+      .width('100%')
+      .justifyContent(FlexAlign.SpaceAround)
+      .padding({ top: Spacing.SM, bottom: Spacing.SM })
+      .backgroundColor(this.colors.bgTertiary)
+      .borderRadius(BorderRadius.MD)
+    }
+    .width('100%')
+  }
+
+  // 统计项
+  @Builder
+  StatItem(count: number | undefined, label: Resource, onClick: () => void) {
+    Column({ space: Spacing.XXS }) {
+      Text((count ?? 0).toString())
+        .fontSize(FontSize.XXL)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(this.colors.textPrimary)
+      Text(label)
+        .fontSize(FontSize.SM)
+        .fontColor(this.colors.textSecondary)
+    }
+    .alignItems(HorizontalAlign.Center)
+    .padding({ left: Spacing.SM, right: Spacing.SM, top: Spacing.XS, bottom: Spacing.XS })
+    .onClick(onClick)
+  }
+
+  // 热门仓库卡片
+  @Builder
+  PopularReposCard() {
+    RFCard({
+      variant: 'filled',
+      colors: this.colors,
+      content: (): void => this.PopularReposContent()
+    })
+  }
+
+  @Builder
+  PopularReposContent() {
+    Column({ space: Spacing.SM }) {
+      Row() {
+        Text($r('app.string.popular_repos'))
+          .fontSize(FontSize.LG)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(this.colors.textPrimary)
+        Blank()
+        Text($r('app.string.view_all'))
+          .fontSize(FontSize.SM)
+          .fontColor(this.colors.brandPrimary)
+          .onClick((): void => {
+            tabState.switchToRepos();
+          })
+      }
+      .width('100%')
+
+      if (this.loadingRepos) {
+        this.LoadingRow()
+      } else if (this.pinnedRepos.length === 0) {
+        Text($r('app.string.no_repos'))
+          .fontSize(FontSize.SM)
+          .fontColor(this.colors.textSecondary)
+      } else {
+        Column({ space: Spacing.XS }) {
+          ForEach(this.pinnedRepos, (repo: GitHubRepo) => {
+            this.MiniRepoCard(repo)
+          }, (repo: GitHubRepo) => repo.id.toString())
+        }
+        .width('100%')
+      }
+    }
+    .width('100%')
+    .alignItems(HorizontalAlign.Start)
+  }
+
+  // 仓库卡片
+  @Builder
+  MiniRepoCard(repo: GitHubRepo) {
+    Row({ space: Spacing.SM }) {
+      Image($r('app.media.ic_repo'))
+        .width(16)
+        .height(16)
+        .fillColor(this.colors.textTertiary)
+
+      Column({ space: 2 }) {
+        Text(repo.name)
+          .fontSize(FontSize.MD)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(this.colors.brandPrimary)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+
+        if (repo.description) {
+          Text(repo.description)
+            .fontSize(FontSize.SM)
+            .fontColor(this.colors.textSecondary)
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+        }
+      }
+      .alignItems(HorizontalAlign.Start)
+      .layoutWeight(1)
+
+      Row({ space: Spacing.XXS }) {
+        Image($r('app.media.ic_star'))
+          .width(12)
+          .height(12)
+          .fillColor(this.colors.warning)
+        Text(this.formatNumber(repo.stargazers_count))
+          .fontSize(FontSize.SM)
+          .fontColor(this.colors.textSecondary)
+      }
+    }
+    .width('100%')
+    .padding(Spacing.SM)
+    .backgroundColor(this.colors.bgTertiary)
+    .borderRadius(BorderRadius.SM)
+    .onClick((): void => {
+      router.pushUrl({
+        url: 'pages/RepoDetailPage',
+        params: { owner: repo.owner.login, repo: repo.name }
+      });
+    })
+  }
+
+  // 最近活动卡片
+  @Builder
+  RecentActivityCard() {
+    RFCard({
+      variant: 'filled',
+      colors: this.colors,
+      content: (): void => this.RecentActivityContent()
+    })
+  }
+
+  @Builder
+  RecentActivityContent() {
+    Column({ space: Spacing.SM }) {
+      Text($r('app.string.recent_activity'))
+        .fontSize(FontSize.LG)
+        .fontWeight(FontWeight.Medium)
+        .fontColor(this.colors.textPrimary)
+        .width('100%')
+
+      if (this.loadingActivity) {
+        this.LoadingRow()
+      } else if (this.recentActivity.length === 0) {
+        Text($r('app.string.no_activity'))
+          .fontSize(FontSize.SM)
+          .fontColor(this.colors.textSecondary)
+      } else {
+        Column({ space: 0 }) {
+          ForEach(this.recentActivity.slice(0, 5), (event: GitHubEvent, index: number) => {
+            this.ActivityItem(event)
+            if (index < Math.min(this.recentActivity.length, 5) - 1) {
+              Divider().color(this.colors.divider).margin({ left: 32 })
+            }
+          }, (event: GitHubEvent) => event.id)
+        }
+        .width('100%')
+      }
+    }
+    .width('100%')
+    .alignItems(HorizontalAlign.Start)
+  }
+
+  // 活动项
+  @Builder
+  ActivityItem(event: GitHubEvent) {
+    Row({ space: Spacing.SM }) {
+      Image(this.getEventIcon(event.type))
+        .width(18)
+        .height(18)
+        .fillColor(this.colors.textTertiary)
+
+      Column({ space: 2 }) {
+        Text(this.getEventDescription(event))
+          .fontSize(FontSize.SM)
+          .fontColor(this.colors.textPrimary)
+          .maxLines(2)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+
+        Text(this.formatTime(event.created_at))
+          .fontSize(FontSize.XS)
+          .fontColor(this.colors.textSecondary)
+      }
+      .alignItems(HorizontalAlign.Start)
+      .layoutWeight(1)
+    }
+    .width('100%')
+    .padding({ top: Spacing.SM, bottom: Spacing.SM })
+  }
+
+  // 语言统计卡片
+  @Builder
+  LanguageStatsCard() {
+    if (this.languageStats.length > 0) {
+      RFCard({
+        variant: 'filled',
+        colors: this.colors,
+        content: (): void => this.LanguageStatsContent()
+      })
+    }
+  }
+
+  @Builder
+  LanguageStatsContent() {
+    Column({ space: Spacing.SM }) {
+      Text($r('app.string.language_stats'))
+        .fontSize(FontSize.LG)
+        .fontWeight(FontWeight.Medium)
+        .fontColor(this.colors.textPrimary)
+        .width('100%')
+
+      Column({ space: Spacing.XS }) {
+        // 进度条
+        Row() {
+          ForEach(this.languageStats, (stat: LanguageStat) => {
+            Row()
+              .width(`${stat.percentage}%`)
+              .height(8)
+              .backgroundColor(stat.color)
+          }, (stat: LanguageStat) => stat.name)
+        }
+        .width('100%')
+        .borderRadius(BorderRadius.XS)
+        .clip(true)
+
+        // 图例
+        Flex({ wrap: FlexWrap.Wrap }) {
+          ForEach(this.languageStats, (stat: LanguageStat) => {
+            Row({ space: Spacing.XXS }) {
+              Circle({ width: 10, height: 10 })
+                .fill(stat.color)
+              Text(`${stat.name} ${stat.percentage}%`)
+                .fontSize(FontSize.SM)
+                .fontColor(this.colors.textSecondary)
+            }
+            .margin({ right: Spacing.SM, bottom: Spacing.XS })
+          }, (stat: LanguageStat) => stat.name)
+        }
+        .width('100%')
+      }
+      .width('100%')
+    }
+    .width('100%')
+    .alignItems(HorizontalAlign.Start)
+  }
+
+  // Star 的仓库卡片
+  @Builder
+  StarredReposCard() {
+    RFCard({
+      variant: 'filled',
+      colors: this.colors,
+      content: (): void => this.StarredReposContent()
+    })
+  }
+
+  @Builder
+  StarredReposContent() {
+    Column({ space: Spacing.SM }) {
+      Row() {
+        Text($r('app.string.starred_repos'))
+          .fontSize(FontSize.LG)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(this.colors.textPrimary)
+        Blank()
+        Text($r('app.string.view_all'))
+          .fontSize(FontSize.SM)
+          .fontColor(this.colors.brandPrimary)
+          .onClick((): void => {
+            router.pushUrl({ url: 'pages/StarredReposPage' });
+          })
+      }
+      .width('100%')
+
+      if (this.loadingStarred) {
+        this.LoadingRow()
+      } else if (this.starredRepos.length === 0) {
+        Text($r('app.string.no_starred_repos'))
+          .fontSize(FontSize.SM)
+          .fontColor(this.colors.textSecondary)
+      } else {
+        Column({ space: Spacing.XS }) {
+          ForEach(this.starredRepos, (repo: GitHubRepo) => {
+            this.MiniRepoCard(repo)
+          }, (repo: GitHubRepo) => repo.id.toString())
+        }
+        .width('100%')
+      }
+    }
+    .width('100%')
+    .alignItems(HorizontalAlign.Start)
+  }
+
+  // 组织卡片
+  @Builder
+  OrganizationsCard() {
+    RFCard({
+      variant: 'filled',
+      colors: this.colors,
+      content: (): void => this.OrganizationsContent()
+    })
+  }
+
+  @Builder
+  OrganizationsContent() {
+    Column({ space: Spacing.SM }) {
+      Text($r('app.string.organizations'))
+        .fontSize(FontSize.LG)
+        .fontWeight(FontWeight.Medium)
+        .fontColor(this.colors.textPrimary)
+        .width('100%')
+
+      if (this.loadingOrgs) {
+        this.LoadingRow()
+      } else if (this.organizations.length === 0) {
+        Text($r('app.string.no_organizations'))
+          .fontSize(FontSize.SM)
+          .fontColor(this.colors.textSecondary)
+      } else {
+        Row({ space: Spacing.SM }) {
+          ForEach(this.organizations, (org: GitHubOrg) => {
+            Column({ space: Spacing.XXS }) {
+              Image(org.avatar_url)
+                .width(48)
+                .height(48)
+                .borderRadius(BorderRadius.SM)
+              Text(org.login)
+                .fontSize(FontSize.XS)
+                .fontColor(this.colors.textSecondary)
+                .maxLines(1)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
+                .constraintSize({ maxWidth: 60 })
+            }
+            .alignItems(HorizontalAlign.Center)
+          }, (org: GitHubOrg) => org.id.toString())
+        }
+      }
+    }
+    .width('100%')
+    .alignItems(HorizontalAlign.Start)
+  }
+
+  // 加载行
+  @Builder
+  LoadingRow() {
+    Row({ space: Spacing.SM }) {
+      LoadingProgress()
+        .width(20)
+        .height(20)
+        .color(this.colors.brandPrimary)
+      Text($r('app.string.loading'))
+        .fontSize(FontSize.SM)
+        .fontColor(this.colors.textSecondary)
+    }
+  }
+
+  // 未登录状态
+  @Builder
+  NotLoggedInView() {
+    Column({ space: Spacing.LG }) {
+      Image($r('app.media.github_mark'))
+        .width(80)
+        .height(80)
+        .fillColor(this.colors.textPrimary)
+
+      Text($r('app.string.login_github'))
+        .fontSize(FontSize.XXL)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(this.colors.textPrimary)
+
+      Text($r('app.string.login_description'))
+        .fontSize(FontSize.MD)
+        .fontColor(this.colors.textSecondary)
+        .textAlign(TextAlign.Center)
+        .padding({ left: Spacing.LG, right: Spacing.LG })
+
+      RFButton({
+        text: $r('app.string.login_github'),
+        variant: 'primary',
+        buttonSize: 'lg',
+        colors: this.colors,
+        onTap: (): void => {
+          this.handleLogin();
+        }
+      })
+        .width('80%')
+        .margin({ top: Spacing.SM })
+    }
+    .width('100%')
+    .alignItems(HorizontalAlign.Center)
+    .padding({ top: 60, bottom: 60 })
+  }
+
+  // 已登录内容 (单栏)
+  @Builder
+  LoggedInContent() {
+    Scroll() {
+      Column({ space: Spacing.MD }) {
+        this.UserInfoCard()
+        this.PopularReposCard()
+        this.RecentActivityCard()
+        this.LanguageStatsCard()
+        this.StarredReposCard()
+        this.OrganizationsCard()
+      }
+      .padding(Spacing.LG)
+      .width('100%')
+    }
+    .width('100%')
+    .layoutWeight(1)
+    .scrollBar(BarState.Off)
+  }
+
+  // 侧边栏内容 (多栏模式)
+  @Builder
+  SideContent() {
+    Scroll() {
+      Column({ space: Spacing.MD }) {
+        this.UserInfoCard()
+        this.LanguageStatsCard()
+        this.OrganizationsCard()
+      }
+      .padding(Spacing.MD)
+      .width('100%')
+    }
+    .width('100%')
+    .height('100%')
+    .scrollBar(BarState.Off)
+  }
+
+  // 详情内容 (多栏模式)
+  @Builder
+  DetailContent() {
+    Scroll() {
+      Column({ space: Spacing.MD }) {
+        this.PopularReposCard()
+        this.RecentActivityCard()
+        this.StarredReposCard()
+      }
+      .padding(Spacing.MD)
+      .width('100%')
+    }
+    .width('100%')
+    .height('100%')
+    .scrollBar(BarState.Off)
+  }
+
+  // =====================================================
+  // 主构建方法
+  // =====================================================
+
+  build() {
+    Column() {
+      // 页面头部
+      this.PageHeader()
+
+      if (this.isLoading) {
+        // 加载中
+        Column({ space: Spacing.SM }) {
+          LoadingProgress()
+            .width(40)
+            .height(40)
+            .color(this.colors.brandPrimary)
+          Text($r('app.string.loading'))
+            .fontSize(FontSize.MD)
+            .fontColor(this.colors.textSecondary)
+        }
+        .width('100%')
+        .layoutWeight(1)
+        .justifyContent(FlexAlign.Center)
+      } else if (this.isLoggedIn && this.user) {
+        // 已登录
+        if (this.layoutMode === LayoutMode.SINGLE) {
+          this.LoggedInContent()
+        } else {
+          RFSplitView({
+            layoutMode: this.layoutMode,
+            primaryWidth: this.layoutMode === LayoutMode.TRIPLE ? 360 : 400,
+            colors: this.colors,
+            showDivider: true,
+            primaryContent: (): void => this.SideContent(),
+            detailContent: (): void => this.DetailContent()
+          })
+        }
+      } else {
+        // 未登录
+        this.NotLoggedInView()
+      }
+    }
+    .width('100%')
+    .height('100%')
+    .backgroundColor(this.colors.bgPrimary)
   }
 }
