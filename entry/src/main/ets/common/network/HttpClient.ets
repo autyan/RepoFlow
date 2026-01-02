@@ -65,7 +65,11 @@ export class HttpClient {
       };
     } catch (error) {
       console.error('HttpClient request failed', JSON.stringify(error));
-      throw error;
+      if (error instanceof Error) {
+        throw error;
+      }
+      const fallbackMessage = typeof error === 'string' ? error : JSON.stringify(error);
+      throw new Error(fallbackMessage);
     } finally {
       httpRequest.destroy();
     }

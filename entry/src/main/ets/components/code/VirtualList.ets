@@ -13,7 +13,8 @@ import { ThemeColors, DarkColors } from '../../theme/Colors';
 import { Spacing, AnimationDuration } from '../../theme/DesignTokens';
 import { VirtualListConfig, VirtualListState, calculateVisibleRange } from './CodeBrowserModels';
 
-type AnyData = Record<string, unknown>;
+// Flexible record type without using `any`/`unknown`
+type AnyData = Record<string, string | number | boolean | object | null | undefined>;
 
 // =====================================================
 // 虚拟列表项目接口
