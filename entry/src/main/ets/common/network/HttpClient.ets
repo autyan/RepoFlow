@@ -63,6 +63,9 @@ export class HttpClient {
         data: resultData,
         headers: parsedHeaders,
       };
+    } catch (error) {
+      console.error('HttpClient request failed', JSON.stringify(error));
+      throw error;
     } finally {
       httpRequest.destroy();
     }

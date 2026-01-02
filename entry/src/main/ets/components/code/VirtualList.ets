@@ -13,6 +13,8 @@ import { ThemeColors, DarkColors } from '../../theme/Colors';
 import { Spacing, AnimationDuration } from '../../theme/DesignTokens';
 import { VirtualListConfig, VirtualListState, calculateVisibleRange } from './CodeBrowserModels';
 
+type AnyData = Record<string, unknown>;
+
 // =====================================================
 // 虚拟列表项目接口
 // =====================================================
@@ -52,11 +54,11 @@ export struct RFVirtualList {
   /** 初始滚动位置 */
   @Prop initialScrollIndex: number = 0;
   /** 获取项目数据回调 */
-  getItemData?: (index: number) => ESObject;
+  getItemData?: (index: number) => AnyData;
   /** 滚动回调 */
   onScroll?: (scrollOffset: number, visibleRange: VisibleRangeInfo) => void;
   /** 项目渲染器 */
-  @BuilderParam itemRenderer: (item: VirtualListItem<ESObject>) => void;
+  @BuilderParam itemRenderer: (item: VirtualListItem<AnyData>) => void;
   
   @State viewportHeight: number = 0;
   @State scrollOffset: number = 0;
@@ -98,11 +100,11 @@ export struct RFVirtualList {
   }
   
   // 获取渲染的项目
-  private getRenderItems(): VirtualListItem<ESObject>[] {
-    const items: VirtualListItem<ESObject>[] = [];
+  private getRenderItems(): VirtualListItem<AnyData>[] {
+    const items: VirtualListItem<AnyData>[] = [];
     
     for (let i = this.listState.renderStartIndex; i <= this.listState.renderEndIndex && i < this.totalItems; i++) {
-      const data: ESObject = this.getItemData ? this.getItemData(i) : ({} as ESObject);
+      const data: AnyData = this.getItemData ? this.getItemData(i) : {};
       items.push({
         index: i,
         data: data,
@@ -150,7 +152,7 @@ export struct RFVirtualList {
         // 撑开滚动区域的容器
         Column() {
           // 实际渲染的项目
-          ForEach(this.getRenderItems(), (item: VirtualListItem<ESObject>) => {
+          ForEach(this.getRenderItems(), (item: VirtualListItem<AnyData>) => {
             Column() {
               if (this.itemRenderer) {
                 this.itemRenderer(item);
@@ -162,7 +164,7 @@ export struct RFVirtualList {
               x: 0,
               y: item.offset
             })
-          }, (item: VirtualListItem<ESObject>) => `item_${item.index}`)
+          }, (item: VirtualListItem<AnyData>) => `item_${item.index}`)
         }
         .width('100%')
         .height(this.getTotalHeight())
@@ -200,17 +202,17 @@ export struct RFVirtualTree {
   /** 项目高度 */
   @Prop itemHeight: number = 32;
   /** 扁平化的树节点数据 */
-  @Prop items: ESObject[] = [];
+  @Prop items: AnyData[] = [];
   /** 缓冲区大小 */
   @Prop bufferSize: number = 10;
   /** 主题颜色 */
   @Prop colors: ThemeColors = DarkColors;
   /** 节点点击回调 */
-  onItemClick?: (item: ESObject, index: number) => void;
+  onItemClick?: (item: AnyData, index: number) => void;
   /** 节点展开/折叠回调 */
-  onToggle?: (item: ESObject, index: number) => void;
+  onToggle?: (item: AnyData, index: number) => void;
   /** 项目渲染器 */
-  @BuilderParam itemRenderer: (item: ESObject, index: number) => void;
+  @BuilderParam itemRenderer: (item: AnyData, index: number) => void;
   
   @State viewportHeight: number = 0;
   @State scrollOffset: number = 0;
@@ -268,7 +270,7 @@ export struct RFVirtualTree {
               this.getRenderRange().start,
               this.getRenderRange().end + 1
             ),
-            (item: ESObject, localIndex: number) => {
+            (item: AnyData, localIndex: number) => {
               Column() {
                 if (this.itemRenderer) {
                   this.itemRenderer(item, this.getActualIndex(localIndex));
@@ -286,7 +288,7 @@ export struct RFVirtualTree {
                 }
               })
             },
-            (item: ESObject, localIndex: number) => {
+            (item: AnyData, localIndex: number) => {
               return `tree_item_${this.getActualIndex(localIndex)}`;
             }
           )

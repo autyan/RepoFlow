@@ -21,23 +21,17 @@ struct SplashPage {
 
     // 动画序列
     setTimeout(() => {
-      animateTo({ duration: AnimationDuration.NORMAL, curve: Curve.EaseOut }, () => {
-        this.logoOpacity = 1;
-        this.logoScale = 1;
-        this.logoY = 0;
-      });
+      this.logoOpacity = 1;
+      this.logoScale = 1;
+      this.logoY = 0;
     }, 200);
 
     setTimeout(() => {
-      animateTo({ duration: AnimationDuration.FAST, curve: Curve.EaseOut }, () => {
-        this.sloganOpacity = 1;
-      });
+      this.sloganOpacity = 1;
     }, 600);
 
     setTimeout(() => {
-      animateTo({ duration: AnimationDuration.FAST, curve: Curve.EaseOut }, () => {
-        this.decorOpacity = 1;
-      });
+      this.decorOpacity = 1;
     }, 900);
 
     // 2.5秒后跳转到主页

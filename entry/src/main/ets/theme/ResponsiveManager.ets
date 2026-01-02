@@ -58,6 +58,7 @@ class ResponsiveManagerImpl {
   private _initialized: boolean = false;
   private _windowStage: window.WindowStage | null = null;
   private _displayCallback: ((status: display.FoldStatus) => void) | null = null;
+  private _vpPerPx: number = 1;
   
   // =====================================================
   // 初始化
@@ -83,18 +84,19 @@ class ResponsiveManagerImpl {
       // 获取显示器信息以转换为 vp
       const displayInfo = display.getDefaultDisplaySync();
       const density = displayInfo.densityPixels;
+      this._vpPerPx = density > 0 ? 1 / density : 1;
       
       // 计算屏幕尺寸 (vp)
-      this._state.screenWidth = px2vp(rect.width);
-      this._state.screenHeight = px2vp(rect.height);
+      this._state.screenWidth = rect.width * this._vpPerPx;
+      this._state.screenHeight = rect.height * this._vpPerPx;
       
       // 更新设备类型和布局
       this.updateDeviceInfo();
       
       // 监听窗口尺寸变化
       mainWindow.on('windowSizeChange', (size) => {
-        this._state.screenWidth = px2vp(size.width);
-        this._state.screenHeight = px2vp(size.height);
+        this._state.screenWidth = size.width * this._vpPerPx;
+        this._state.screenHeight = size.height * this._vpPerPx;
         this.updateDeviceInfo();
         this.notifyListeners();
       });
