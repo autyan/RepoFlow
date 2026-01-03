@@ -1,7 +1,5 @@
-import router from '@ohos.router';
-
-const PRIMARY_TEXT = '#1F2328';
-const SECONDARY_TEXT = '#656D76';
+const PRIVACY_PRIMARY_TEXT: string = '#1F2328';
+const PRIVACY_SECONDARY_TEXT: string = '#656D76';
 
 @Entry
 @Component
@@ -14,19 +12,19 @@ struct PrivacyPage {
           Image($r('app.media.ic_back'))
             .width(24)
             .height(24)
-            .fillColor(PRIMARY_TEXT)
+            .fillColor(PRIVACY_PRIMARY_TEXT)
         }
         .width(40)
         .height(40)
         .justifyContent(FlexAlign.Center)
         .onClick(() => {
-          router.back();
+          this.getUIContext().getRouter().back();
         })
 
         Text($r('app.string.privacy_policy'))
           .fontSize(18)
           .fontWeight(FontWeight.Medium)
-          .fontColor(PRIMARY_TEXT)
+          .fontColor(PRIVACY_PRIMARY_TEXT)
           .layoutWeight(1)
           .textAlign(TextAlign.Center)
 
@@ -42,12 +40,12 @@ struct PrivacyPage {
           Text($r('app.string.privacy_repoflow'))
             .fontSize(20)
             .fontWeight(FontWeight.Bold)
-            .fontColor(PRIMARY_TEXT)
+            .fontColor(PRIVACY_PRIMARY_TEXT)
             .width('100%')
 
           Text($r('app.string.privacy_update_date'))
             .fontSize(12)
-            .fontColor(SECONDARY_TEXT)
+            .fontColor(PRIVACY_SECONDARY_TEXT)
             .width('100%')
 
           this.Section('概述', 'RepoFlow 是一款尊重用户隐私的开源应用。我们致力于保护您的个人信息，本隐私政策说明了我们如何收集、使用和保护您的数据。')
@@ -87,11 +85,11 @@ struct PrivacyPage {
       Text(title)
         .fontSize(16)
         .fontWeight(FontWeight.Medium)
-        .fontColor(PRIMARY_TEXT)
+        .fontColor(PRIVACY_PRIMARY_TEXT)
         .width('100%')
       Text(content)
         .fontSize(14)
-        .fontColor(SECONDARY_TEXT)
+        .fontColor(PRIVACY_SECONDARY_TEXT)
         .lineHeight(24)
         .width('100%')
     }

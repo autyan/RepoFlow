@@ -1,5 +1,3 @@
-import router from '@ohos.router';
-
 const PRIMARY_TEXT = '#1F2328';
 const SECONDARY_TEXT = '#656D76';
 const ACCENT = '#0969DA';
@@ -63,7 +61,7 @@ export struct LoginPrompt {
         .backgroundColor(ACCENT)
         .borderRadius(8)
         .onClick(() => {
-          router.pushUrl({ url: 'pages/LoginPage' });
+          this.getUIContext().getRouter().pushUrl({ url: 'pages/LoginPage' });
         })
 
       // 稍后再说

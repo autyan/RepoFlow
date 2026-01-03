@@ -7,7 +7,6 @@
  * - 支持响应式布局和主题切换
  */
 
-import router from '@ohos.router';
 import { authManager } from '../services/AuthManager';
 import {
   ThemeManager,
@@ -23,6 +22,7 @@ import {
 import {
   RFButton,
 } from '../components';
+import { UIHelper } from '../common/ui';
 
 // 关键字映射
 const KEYWORDS: Record<string, string[]> = {
@@ -65,8 +65,13 @@ struct FileViewerPage {
   private branch: string = 'main';
 
   private t(res: Resource, ...args: Array<string | number>): string {
-    const rm = getContext(this).resourceManager;
-    return rm.getStringSync(res.id, ...args);
+    try {
+      const rm = this.getUIContext()!.getHostContext()!.resourceManager!;
+      return rm.getStringSync(res.id, ...args);
+    } catch (error) {
+      console.error('Resource loading failed:', error);
+      return '';
+    }
   }
 
   // 主题状态
@@ -93,7 +98,7 @@ struct FileViewerPage {
       this.deviceType = state.deviceType;
     });
 
-    const params = router.getParams() as RouteParams | undefined;
+    const params = this.getUIContext()!.getRouter()!.getParams() as RouteParams | undefined;
     if (params) {
       this.owner = params.owner;
       this.repoName = params.repo;
@@ -204,7 +209,7 @@ struct FileViewerPage {
       .height(40)
       .justifyContent(FlexAlign.Center)
       .onClick((): void => {
-        router.back();
+        UIHelper.goBack(this);
       })
 
       Column() {

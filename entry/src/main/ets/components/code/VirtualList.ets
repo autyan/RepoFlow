@@ -176,7 +176,7 @@ export struct RFVirtualList {
       .scrollBar(BarState.Auto)
       .scrollBarColor(this.colors.border)
       .edgeEffect(EdgeEffect.None)
-      .onScroll((xOffset: number, yOffset: number) => {
+      .onDidScroll((xOffset: number, yOffset: number) => {
         this.scrollOffset = this.scrollController.currentOffset().yOffset;
         this.updateVisibleRange();
       })
@@ -303,7 +303,7 @@ export struct RFVirtualTree {
       .scrollBar(BarState.Auto)
       .scrollBarColor(this.colors.border)
       .edgeEffect(EdgeEffect.None)
-      .onScroll(() => {
+      .onDidScroll(() => {
         this.scrollOffset = this.scrollController.currentOffset().yOffset;
         this.updateVisibleRange();
       })

@@ -1,9 +1,9 @@
 import { webview } from '@kit.ArkWeb';
 import { authManager } from '../services/AuthManager';
-import router from '@ohos.router';
 import { promptAction } from '@kit.ArkUI';
 import { ThemeManager, ThemeColors } from '../theme';
 import { Spacing, FontSize } from '../theme/DesignTokens';
+import { UIHelper } from '../common/ui';
 
 @Entry
 @Component
@@ -35,7 +35,7 @@ struct LoginPage {
         }
         .backgroundColor(Color.Transparent)
         .onClick(() => {
-          router.back();
+          UIHelper.goBack(this);
         })
 
         Text($r('app.string.login_github'))
@@ -77,7 +77,7 @@ struct LoginPage {
         .onPageEnd(() => {
           this.isLoading = false;
         })
-        .onUrlLoadIntercept((event) => {
+        .onLoadIntercept((event) => {
           const url = event?.data?.toString() ?? '';
           console.info('WebView navigating to:', url);
 
@@ -107,8 +107,8 @@ struct LoginPage {
 
     if (!code) {
       console.error('No authorization code received');
-      promptAction.showToast({ message: getContext(this).resourceManager.getStringSync($r('app.string.auth_failed_no_code').id) });
-      router.back();
+      UIHelper.showToast(this, $r('app.string.auth_failed_no_code'), 'Auth failed: no code');
+      UIHelper.goBack(this);
       return;
     }
 
@@ -120,17 +120,19 @@ struct LoginPage {
       .then((success) => {
         console.info('OAuth callback result:', success ? 'success' : 'failed');
         if (success) {
-          promptAction.showToast({ message: getContext(this).resourceManager.getStringSync($r('app.string.login_success').id) });
+          UIHelper.showToast(this, $r('app.string.login_success'), 'Login success');
         } else {
-          promptAction.showToast({ message: getContext(this).resourceManager.getStringSync($r('app.string.login_failed').id) });
+          UIHelper.showToast(this, $r('app.string.login_failed'), 'Login failed');
         }
         // 返回设置页
-        router.back();
+        UIHelper.goBack(this);
       })
       .catch((err: Error) => {
         console.error('OAuth callback error:', JSON.stringify(err));
-        promptAction.showToast({ message: getContext(this).resourceManager.getStringSync($r('app.string.login_error').id) + (err.message || getContext(this).resourceManager.getStringSync($r('app.string.unknown_error').id)) });
-        router.back();
+        const errorMsg = UIHelper.getString(this, $r('app.string.login_error'), 'Login error: ') + 
+          (err.message || UIHelper.getString(this, $r('app.string.unknown_error'), 'Unknown error'));
+        UIHelper.showToast(this, null, errorMsg);
+        UIHelper.goBack(this);
       });
   }
 

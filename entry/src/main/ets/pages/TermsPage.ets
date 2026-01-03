@@ -1,7 +1,5 @@
-import router from '@ohos.router';
-
-const PRIMARY_TEXT = '#1F2328';
-const SECONDARY_TEXT = '#656D76';
+const TERMS_PRIMARY_TEXT: string = '#1F2328';
+const TERMS_SECONDARY_TEXT: string = '#656D76';
 
 @Entry
 @Component
@@ -14,19 +12,19 @@ struct TermsPage {
           Image($r('app.media.ic_back'))
             .width(24)
             .height(24)
-            .fillColor(PRIMARY_TEXT)
+            .fillColor(TERMS_PRIMARY_TEXT)
         }
         .width(40)
         .height(40)
         .justifyContent(FlexAlign.Center)
         .onClick(() => {
-          router.back();
+          this.getUIContext().getRouter().back();
         })
 
         Text($r('app.string.terms_of_service'))
           .fontSize(18)
           .fontWeight(FontWeight.Medium)
-          .fontColor(PRIMARY_TEXT)
+          .fontColor(TERMS_PRIMARY_TEXT)
           .layoutWeight(1)
           .textAlign(TextAlign.Center)
 
@@ -42,12 +40,12 @@ struct TermsPage {
           Text($r('app.string.terms_repoflow'))
             .fontSize(20)
             .fontWeight(FontWeight.Bold)
-            .fontColor(PRIMARY_TEXT)
+            .fontColor(TERMS_PRIMARY_TEXT)
             .width('100%')
 
           Text($r('app.string.terms_update_date'))
             .fontSize(12)
-            .fontColor(SECONDARY_TEXT)
+            .fontColor(TERMS_SECONDARY_TEXT)
             .width('100%')
 
           this.Section('1. 服务说明', 'RepoFlow 是一款个人开发的非盈利第三方 GitHub 客户端应用。本应用通过 GitHub 官方 API 提供服务，旨在为用户提供更便捷的移动端 GitHub 使用体验。')
@@ -83,11 +81,11 @@ struct TermsPage {
       Text(title)
         .fontSize(16)
         .fontWeight(FontWeight.Medium)
-        .fontColor(PRIMARY_TEXT)
+        .fontColor(TERMS_PRIMARY_TEXT)
         .width('100%')
       Text(content)
         .fontSize(14)
-        .fontColor(SECONDARY_TEXT)
+        .fontColor(TERMS_SECONDARY_TEXT)
         .lineHeight(24)
         .width('100%')
     }

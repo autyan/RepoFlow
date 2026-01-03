@@ -11,7 +11,6 @@
  * - 支持响应式布局和主题切换
  */
 
-import router from '@ohos.router';
 import { authManager } from '../services/AuthManager';
 import { userState } from '../common/state/UserState';
 import { tabState } from '../common/state/TabState';
@@ -35,6 +34,7 @@ import {
   RFSplitView,
   RFPageHeader,
 } from '../components';
+import { UIHelper } from '../common/ui';
 
 // =====================================================
 // 类型定义
@@ -66,8 +66,13 @@ export default struct ProfilePage {
   @State loadingOrgs: boolean = false;
 
   private t(res: Resource, ...args: Array<string | number>): string {
-    const rm = getContext(this).resourceManager;
-    return rm.getStringSync(res.id, ...args);
+    try {
+      const rm = this.getUIContext()!.getHostContext()!.resourceManager!;
+      return rm.getStringSync(res.id, ...args);
+    } catch (error) {
+      console.error('Resource loading failed:', error);
+      return '';
+    }
   }
 
   // 主题状态
@@ -210,11 +215,7 @@ export default struct ProfilePage {
   }
 
   async handleLogin(): Promise<void> {
-    try {
-      await router.pushUrl({ url: 'pages/LoginPage' });
-    } catch (error) {
-      console.error('Login navigation failed:', JSON.stringify(error));
-    }
+    UIHelper.pushUrl(this, 'pages/LoginPage');
   }
 
   // =====================================================
@@ -315,7 +316,7 @@ export default struct ProfilePage {
       .height(40)
       .justifyContent(FlexAlign.Center)
       .onClick((): void => {
-        router.pushUrl({ url: 'pages/SettingsPage' });
+        UIHelper.pushUrl(this, 'pages/SettingsPage');
       })
     }
     .width('100%')
@@ -418,17 +419,11 @@ export default struct ProfilePage {
         })
         Divider().vertical(true).height(32).color(this.colors.divider)
         this.StatItem(this.user!.followers, $r('app.string.followers'), (): void => {
-          router.pushUrl({
-            url: 'pages/FollowListPage',
-            params: { username: this.user?.login, type: 'followers' }
-          });
+          UIHelper.pushUrl(this, 'pages/FollowListPage', { username: this.user?.login, type: 'followers' });
         })
         Divider().vertical(true).height(32).color(this.colors.divider)
         this.StatItem(this.user!.following, $r('app.string.following'), (): void => {
-          router.pushUrl({
-            url: 'pages/FollowListPage',
-            params: { username: this.user?.login, type: 'following' }
-          });
+          UIHelper.pushUrl(this, 'pages/FollowListPage', { username: this.user?.login, type: 'following' });
         })
       }
       .width('100%')
@@ -547,10 +542,7 @@ export default struct ProfilePage {
     .backgroundColor(this.colors.bgTertiary)
     .borderRadius(BorderRadius.SM)
     .onClick((): void => {
-      router.pushUrl({
-        url: 'pages/RepoDetailPage',
-        params: { owner: repo.owner.login, repo: repo.name }
-      });
+      UIHelper.pushUrl(this, 'pages/RepoDetailPage', { owner: repo.owner.login, repo: repo.name });
     })
   }
 
@@ -701,7 +693,7 @@ export default struct ProfilePage {
           .fontSize(FontSize.SM)
           .fontColor(this.colors.brandPrimary)
           .onClick((): void => {
-            router.pushUrl({ url: 'pages/StarredReposPage' });
+            UIHelper.pushUrl(this, 'pages/StarredReposPage');
           })
       }
       .width('100%')

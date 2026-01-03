@@ -7,7 +7,6 @@
  * - 支持响应式布局和主题切换
  */
 
-import router from '@ohos.router';
 import { authManager } from '../services/AuthManager';
 import { GitHubUser } from '../models/GitHubModels';
 import {
@@ -27,6 +26,7 @@ import {
   RFAvatar,
   RFSplitView,
 } from '../components';
+import { UIHelper } from '../common/ui';
 
 interface RouteParams {
   username: string;
@@ -51,8 +51,13 @@ struct FollowListPage {
   private page: number = 1;
 
   private t(res: Resource, ...args: Array<string | number>): string {
-    const rm = getContext(this).resourceManager;
-    return rm.getStringSync(res.id, ...args);
+    try {
+      const rm = this.getUIContext()!.getHostContext()!.resourceManager!;
+      return rm.getStringSync(res.id, ...args);
+    } catch (error) {
+      console.error('Resource loading failed:', error);
+      return '';
+    }
   }
 
   // 主题状态
@@ -80,7 +85,7 @@ struct FollowListPage {
       this.deviceType = state.deviceType;
     });
 
-    const params = router.getParams() as RouteParams | undefined;
+    const params = this.getUIContext()!.getRouter()!.getParams() as RouteParams | undefined;
     if (params) {
       this.username = params.username;
       this.type = params.type;
@@ -131,10 +136,7 @@ struct FollowListPage {
     if (this.layoutMode !== LayoutMode.SINGLE) {
       this.selectedUser = user;
     } else {
-      router.pushUrl({
-        url: 'pages/UserProfilePage',
-        params: { username: user.login }
-      });
+      UIHelper.pushUrl(this, 'pages/UserProfilePage', { username: user.login });
     }
   }
 
@@ -160,7 +162,7 @@ struct FollowListPage {
       .height(40)
       .justifyContent(FlexAlign.Center)
       .onClick((): void => {
-        router.back();
+        UIHelper.goBack(this);
       })
 
       Text(this.getTitle())
@@ -397,10 +399,7 @@ struct FollowListPage {
           fullWidth: true,
           colors: this.colors,
           onTap: (): void => {
-            router.pushUrl({
-              url: 'pages/UserProfilePage',
-              params: { username: this.selectedUser!.login }
-            });
+            UIHelper.pushUrl(this, 'pages/UserProfilePage', { username: this.selectedUser!.login });
           }
         })
       }

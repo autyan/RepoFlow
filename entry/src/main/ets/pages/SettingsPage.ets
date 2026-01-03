@@ -1,9 +1,8 @@
-import router from '@ohos.router';
 import { authManager } from '../services/AuthManager';
 import { userState } from '../common/state/UserState';
-import promptAction from '@ohos.promptAction';
 import { ThemeManager, ThemeMode, ThemeColors } from '../theme';
 import { Spacing, BorderRadius, FontSize } from '../theme/DesignTokens';
+import { UIHelper } from '../common/ui';
 
 @Entry
 @Component
@@ -31,7 +30,7 @@ struct SettingsPage {
 
   async handleLogout(): Promise<void> {
     try {
-      const result = await promptAction.showDialog({
+      const result = await this.getUIContext()!.getPromptAction()!.showDialog({
         title: $r('app.string.logout'),
         message: $r('app.string.logout_confirm'),
         buttons: [
@@ -42,7 +41,7 @@ struct SettingsPage {
 
       if (result.index === 1) {
         await authManager.logout();
-        router.back();
+        UIHelper.goBack(this);
       }
     } catch (error) {
       console.error('Logout dialog failed:', JSON.stringify(error));
@@ -51,7 +50,7 @@ struct SettingsPage {
 
   async handleThemeChange(): Promise<void> {
     try {
-      const result = await promptAction.showActionMenu({
+      const result = await this.getUIContext()!.getPromptAction()!.showActionMenu({
         title: $r('app.string.theme_mode'),
         buttons: [
           { text: $r('app.string.theme_system'), color: this.colors.textPrimary as string },
@@ -96,7 +95,7 @@ struct SettingsPage {
         .height(40)
         .justifyContent(FlexAlign.Center)
         .onClick(() => {
-          router.back();
+          UIHelper.goBack(this);
         })
 
         Text($r('app.string.settings'))
@@ -222,7 +221,7 @@ struct SettingsPage {
               .height(52)
               .padding({ left: Spacing.MD, right: Spacing.MD })
               .onClick(() => {
-                router.pushUrl({ url: 'pages/OpenSourcePage' });
+                UIHelper.pushUrl(this, 'pages/OpenSourcePage');
               })
 
               Divider().color(this.colors.border).margin({ left: Spacing.MD })
@@ -242,7 +241,7 @@ struct SettingsPage {
               .height(52)
               .padding({ left: Spacing.MD, right: Spacing.MD })
               .onClick(() => {
-                router.pushUrl({ url: 'pages/TermsPage' });
+                UIHelper.pushUrl(this, 'pages/TermsPage');
               })
 
               Divider().color(this.colors.border).margin({ left: Spacing.MD })
@@ -262,7 +261,7 @@ struct SettingsPage {
               .height(52)
               .padding({ left: Spacing.MD, right: Spacing.MD })
               .onClick(() => {
-                router.pushUrl({ url: 'pages/PrivacyPage' });
+                UIHelper.pushUrl(this, 'pages/PrivacyPage');
               })
             }
             .width('100%')

@@ -9,7 +9,6 @@
  * 支持响应式布局和主题切换
  */
 
-import router from '@ohos.router';
 import { userState } from '../common/state/UserState';
 import { authManager } from '../services/AuthManager';
 import { GitHubUser, GitHubIssue, GitHubEvent, GitHubSecurityAlert } from '../models/GitHubModels';
@@ -31,6 +30,7 @@ import {
   RFAvatar,
   RFSplitView,
 } from '../components';
+import { UIHelper } from '../common/ui';
 
 // =====================================================
 // 首页组件
@@ -235,7 +235,7 @@ export default struct HomePage {
         fullWidth: true,
         colors: this.colors,
         onTap: (): void => {
-          router.pushUrl({ url: 'pages/LoginPage' });
+          UIHelper.pushUrl(this, 'pages/LoginPage');
         }
       })
         .margin({ top: Spacing.XS })
@@ -285,9 +285,7 @@ export default struct HomePage {
             .fontColor(this.colors.brandPrimary)
         }
         .onClick(() => {
-          router.pushUrl({
-            url: 'pages/SecurityAlertsPage'
-          });
+          UIHelper.pushUrl(this, 'pages/SecurityAlertsPage');
         })
       }
       .width('100%')
@@ -337,13 +335,10 @@ export default struct HomePage {
     .width('100%')
     .padding({ top: Spacing.XS, bottom: Spacing.XS })
     .onClick(() => {
-      router.pushUrl({
-        url: 'pages/SecurityAlertDetailPage',
-        params: {
-          alert: alert,
-          owner: alert.repository?.owner?.login || '',
-          repo: alert.repository?.name || ''
-        }
+      UIHelper.pushUrl(this, 'pages/SecurityAlertDetailPage', {
+        alert: alert,
+        owner: alert.repository?.owner?.login || '',
+        repo: alert.repository?.name || ''
       });
     })
   }
@@ -389,8 +384,7 @@ export default struct HomePage {
         Blank()
 
         if (this.assignedIssues.length > 0) {
-          Text(getContext(this).resourceManager.getStringSync($r('app.string.items_count').id)
-            .replace('%d', this.assignedIssues.length.toString()))
+          Text(`${this.assignedIssues.length} items`)
             .fontSize(FontSize.SM)
             .fontColor(this.colors.textSecondary)
         }
@@ -441,8 +435,7 @@ export default struct HomePage {
         }, (issue: GitHubIssue) => issue.id.toString())
 
         if (this.assignedIssues.length > 5) {
-          Text(getContext(this).resourceManager.getStringSync($r('app.string.more_items').id)
-            .replace('%d', (this.assignedIssues.length - 5).toString()))
+          Text(`${this.assignedIssues.length - 5} more`)
             .fontSize(FontSize.SM)
             .fontColor(this.colors.brandPrimary)
             .padding({ top: Spacing.XS })
@@ -531,13 +524,10 @@ export default struct HomePage {
       const urlParts = issue.html_url.split('/');
       const repoIndex = urlParts.indexOf('github.com') + 1;
       if (repoIndex > 0 && urlParts.length > repoIndex + 1) {
-        router.pushUrl({
-          url: 'pages/IssueDetailPage',
-          params: {
-            owner: urlParts[repoIndex],
-            repo: urlParts[repoIndex + 1],
-            issueNumber: issue.number
-          }
+        UIHelper.pushUrl(this, 'pages/IssueDetailPage', {
+          owner: urlParts[repoIndex],
+          repo: urlParts[repoIndex + 1],
+          issueNumber: issue.number
         });
       }
     })
@@ -621,10 +611,7 @@ export default struct HomePage {
       // 点击跳转到对应仓库
       const repoParts = event.repo.name.split('/');
       if (repoParts.length === 2) {
-        router.pushUrl({
-          url: 'pages/RepoDetailPage',
-          params: { owner: repoParts[0], repo: repoParts[1] }
-        });
+        UIHelper.pushUrl(this, 'pages/RepoDetailPage', { owner: repoParts[0], repo: repoParts[1] });
       }
     })
   }
@@ -651,57 +638,69 @@ export default struct HomePage {
   }
 
   getEventDescription(event: GitHubEvent): ResourceStr {
-    const repoName = event.repo.name.split('/')[1] || event.repo.name;
-    switch (event.type) {
-      case 'PushEvent':
-        const commits = event.payload.size || 1;
-        return getContext(this).resourceManager.getStringSync($r('app.string.push_commits').id)
-          .replace('%d', commits.toString()).replace('%s', repoName);
-      case 'CreateEvent':
-        return getContext(this).resourceManager.getStringSync($r('app.string.create_ref').id)
-          .replace('%s', event.payload.ref_type || 'branch').replace('%s', repoName);
-      case 'PullRequestEvent':
-        return getContext(this).resourceManager.getStringSync($r('app.string.action_pr').id)
-          .replace('%s', event.payload.action || 'action').replace('%s', repoName);
-      case 'IssuesEvent':
-        return getContext(this).resourceManager.getStringSync($r('app.string.action_issue').id)
-          .replace('%s', event.payload.action || 'action').replace('%s', repoName);
-      case 'WatchEvent':
-        return getContext(this).resourceManager.getStringSync($r('app.string.starred_repo').id)
-          .replace('%s', repoName);
-      case 'ForkEvent':
-        return getContext(this).resourceManager.getStringSync($r('app.string.forked_repo').id)
-          .replace('%s', repoName);
-      case 'IssueCommentEvent':
-        return getContext(this).resourceManager.getStringSync($r('app.string.commented_repo').id)
-          .replace('%s', repoName);
-      default:
-        return getContext(this).resourceManager.getStringSync($r('app.string.event_in_repo').id)
-          .replace('%s', event.type.replace('Event', '')).replace('%s', repoName);
+    try {
+      const repoName = event.repo.name.split('/')[1] || event.repo.name;
+      const rm = this.getUIContext()!.getHostContext()!.resourceManager!;
+      switch (event.type) {
+        case 'PushEvent':
+          const commits = event.payload.size || 1;
+          return rm.getStringSync($r('app.string.push_commits').id)
+            .replace('%d', commits.toString()).replace('%s', repoName);
+        case 'CreateEvent':
+          return rm.getStringSync($r('app.string.create_ref').id)
+            .replace('%s', event.payload.ref_type || 'branch').replace('%s', repoName);
+        case 'PullRequestEvent':
+          return rm.getStringSync($r('app.string.action_pr').id)
+            .replace('%s', event.payload.action || 'action').replace('%s', repoName);
+        case 'IssuesEvent':
+          return rm.getStringSync($r('app.string.action_issue').id)
+            .replace('%s', event.payload.action || 'action').replace('%s', repoName);
+        case 'WatchEvent':
+          return rm.getStringSync($r('app.string.starred_repo').id)
+            .replace('%s', repoName);
+        case 'ForkEvent':
+          return rm.getStringSync($r('app.string.forked_repo').id)
+            .replace('%s', repoName);
+        case 'IssueCommentEvent':
+          return rm.getStringSync($r('app.string.commented_repo').id)
+            .replace('%s', repoName);
+        default:
+          return rm.getStringSync($r('app.string.event_in_repo').id)
+            .replace('%s', event.type.replace('Event', '')).replace('%s', repoName);
+      }
+    } catch (error) {
+      console.error('Get event description failed:', error);
+      return event.type;
     }
   }
 
   formatEventTime(dateStr: string): ResourceStr {
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(diff / 3600000);
-    const days = Math.floor(diff / 86400000);
+    try {
+      const date = new Date(dateStr);
+      const now = new Date();
+      const diff = now.getTime() - date.getTime();
+      const minutes = Math.floor(diff / 60000);
+      const hours = Math.floor(diff / 3600000);
+      const days = Math.floor(diff / 86400000);
 
-    if (minutes < 60) {
-      return getContext(this).resourceManager.getStringSync($r('app.string.minutes_ago').id)
-        .replace('%d', minutes.toString());
+      const rm = this.getUIContext()!.getHostContext()!.resourceManager!;
+      if (minutes < 60) {
+        return rm.getStringSync($r('app.string.minutes_ago').id)
+          .replace('%d', minutes.toString());
+      }
+      if (hours < 24) {
+        return rm.getStringSync($r('app.string.hours_ago').id)
+          .replace('%d', hours.toString());
+      }
+      if (days < 7) {
+        return rm.getStringSync($r('app.string.days_ago').id)
+          .replace('%d', days.toString());
+      }
+      return date.toLocaleDateString();
+    } catch (error) {
+      console.error('Format event time failed:', error);
+      return dateStr;
     }
-    if (hours < 24) {
-      return getContext(this).resourceManager.getStringSync($r('app.string.hours_ago').id)
-        .replace('%d', hours.toString());
-    }
-    if (days < 7) {
-      return getContext(this).resourceManager.getStringSync($r('app.string.days_ago').id)
-        .replace('%d', days.toString());
-    }
-    return date.toLocaleDateString();
   }
 
   // 主内容区域 (单栏)

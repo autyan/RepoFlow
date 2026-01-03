@@ -12,7 +12,6 @@
  * - 动画切换
  */
 
-import router from '@ohos.router';
 import { ThemeColors, DarkColors } from '../../theme/Colors';
 import {
   Spacing,
@@ -210,7 +209,7 @@ export struct RFSideNavIcon {
         .fillColor(this.colors.textTertiary)
         .margin({ bottom: Spacing.MD })
         .onClick(() => {
-          router.pushUrl({ url: 'pages/SettingsPage' });
+          this.getUIContext().getRouter().pushUrl({ url: 'pages/SettingsPage' });
         })
     }
     .width(NavHeight.SIDE_ICON)
@@ -359,7 +358,7 @@ export struct RFSideNavExpanded {
       .margin({ left: Spacing.SM, right: Spacing.SM, bottom: Spacing.MD })
       .borderRadius(BorderRadius.MD)
       .onClick(() => {
-        router.pushUrl({ url: 'pages/SettingsPage' });
+        this.getUIContext().getRouter().pushUrl({ url: 'pages/SettingsPage' });
       })
     }
     .width(NavHeight.SIDE_EXPANDED)

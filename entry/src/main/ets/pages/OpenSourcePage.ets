@@ -1,6 +1,8 @@
 import router from '@ohos.router';
 import { Markdown, MarkdownController } from '@luvi/lv-markdown-in';
 
+import { UIHelper } from '../common/ui';
+
 const PRIMARY_TEXT = '#1F2328';
 const SECONDARY_TEXT = '#656D76';
 const ACCENT = '#0969DA';
@@ -54,7 +56,7 @@ struct OpenSourcePage {
         .height(40)
         .justifyContent(FlexAlign.Center)
         .onClick(() => {
-          router.back();
+          UIHelper.goBack(this);
         })
 
         Text($r('app.string.open_source_libs'))

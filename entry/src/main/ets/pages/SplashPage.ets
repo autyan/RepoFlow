@@ -1,4 +1,3 @@
-import router from '@ohos.router';
 import { authManager } from '../services/AuthManager';
 import { ThemeManager, ThemeColors } from '../theme';
 import { Spacing, BorderRadius, FontSize, AnimationDuration } from '../theme/DesignTokens';
@@ -36,7 +35,7 @@ struct SplashPage {
 
     // 2.5秒后跳转到主页
     setTimeout(() => {
-      router.replaceUrl({ url: 'pages/Index' });
+      this.getUIContext().getRouter().replaceUrl({ url: 'pages/Index' });
     }, 2500);
   }
 

@@ -7,7 +7,6 @@
  * - 支持响应式布局和主题切换
  */
 
-import router from '@ohos.router';
 import { userState } from '../common/state/UserState';
 import { authManager } from '../services/AuthManager';
 import { GitHubRepo, GitHubSearchResult } from '../models/GitHubModels';
@@ -29,6 +28,7 @@ import {
   RFSearchInput,
   RFSplitView,
 } from '../components';
+import { UIHelper } from '../common/ui';
 
 // =====================================================
 // 类型定义
@@ -158,12 +158,9 @@ export default struct ReposPage {
     if (this.layoutMode !== LayoutMode.SINGLE) {
       this.selectedRepo = repo;
     } else {
-      router.pushUrl({
-        url: 'pages/RepoDetailPage',
-        params: {
-          owner: repo.owner?.login || '',
-          repo: repo.name
-        }
+      UIHelper.pushUrl(this, 'pages/RepoDetailPage', {
+        owner: repo.owner?.login || '',
+        repo: repo.name
       });
     }
   }
@@ -434,12 +431,9 @@ export default struct ReposPage {
             .backgroundColor(this.colors.brandPrimary)
             .borderRadius(BorderRadius.SM)
             .onClick((): void => {
-              router.pushUrl({
-                url: 'pages/RepoDetailPage',
-                params: {
-                  owner: this.selectedRepo!.owner?.login || '',
-                  repo: this.selectedRepo!.name
-                }
+              UIHelper.pushUrl(this, 'pages/RepoDetailPage', {
+                owner: this.selectedRepo!.owner?.login || '',
+                repo: this.selectedRepo!.name
               });
             })
         }

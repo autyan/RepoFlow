@@ -3,7 +3,6 @@
  * 显示单个安全警报的详细信息
  */
 
-import router from '@ohos.router';
 import { GitHubSecurityAlert } from '../models/GitHubModels';
 import {
   ThemeManager,
@@ -13,6 +12,7 @@ import {
   FontSize,
 } from '../theme';
 import { RFCard, RFButton } from '../components';
+import { UIHelper } from '../common/ui';
 
 interface PageParams {
   alert: GitHubSecurityAlert;
@@ -41,7 +41,7 @@ struct SecurityAlertDetailPage {
   }
 
   private loadParams(): void {
-    const params = router.getParams() as PageParams;
+    const params = this.getUIContext()!.getRouter()!.getParams() as PageParams;
     if (params) {
       this.alert = params.alert;
       this.owner = params.owner;
@@ -113,7 +113,7 @@ struct SecurityAlertDetailPage {
           .height(24)
           .fillColor(this.colors.textPrimary)
           .onClick(() => {
-            router.back();
+            UIHelper.goBack(this);
           })
 
         Text($r('app.string.alert_details'))

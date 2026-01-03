@@ -7,7 +7,6 @@
  * - 支持响应式布局和主题切换
  */
 
-import router from '@ohos.router';
 import { authManager } from '../services/AuthManager';
 import { GitHubRepo } from '../models/GitHubModels';
 import {
@@ -26,6 +25,7 @@ import {
   RFButton,
   RFSplitView,
 } from '../components';
+import { UIHelper } from '../common/ui';
 
 // =====================================================
 // Star 仓库列表页面
@@ -104,10 +104,7 @@ struct StarredReposPage {
     if (this.layoutMode !== LayoutMode.SINGLE) {
       this.selectedRepo = repo;
     } else {
-      router.pushUrl({
-        url: 'pages/RepoDetailPage',
-        params: { owner: repo.owner.login, repo: repo.name }
-      });
+      UIHelper.pushUrl(this, 'pages/RepoDetailPage', { owner: repo.owner.login, repo: repo.name });
     }
   }
 
@@ -156,7 +153,7 @@ struct StarredReposPage {
       .height(40)
       .justifyContent(FlexAlign.Center)
       .onClick((): void => {
-        router.back();
+        UIHelper.goBack(this);
       })
 
       Text($r('app.string.starred_repos'))
@@ -423,10 +420,7 @@ struct StarredReposPage {
           fullWidth: true,
           colors: this.colors,
           onTap: (): void => {
-            router.pushUrl({
-              url: 'pages/RepoDetailPage',
-              params: { owner: this.selectedRepo!.owner.login, repo: this.selectedRepo!.name }
-            });
+            UIHelper.pushUrl(this, 'pages/RepoDetailPage', { owner: this.selectedRepo!.owner.login, repo: this.selectedRepo!.name });
           }
         })
       }

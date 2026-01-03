@@ -7,7 +7,6 @@
  * - 支持响应式布局和主题切换
  */
 
-import router from '@ohos.router';
 import { authManager } from '../services/AuthManager';
 import { GitHubUser, GitHubRepo, GitHubOrg } from '../models/GitHubModels';
 import {
@@ -28,6 +27,7 @@ import {
   RFAvatar,
   RFSplitView,
 } from '../components';
+import { UIHelper } from '../common/ui';
 
 interface RouteParams {
   username: string;
@@ -73,7 +73,7 @@ struct UserProfilePage {
       this.deviceType = state.deviceType;
     });
 
-    const params = router.getParams() as RouteParams;
+    const params = this.getUIContext()!.getRouter()!.getParams() as RouteParams;
     if (params?.username) {
       this.username = params.username;
       this.loadUserData();
@@ -109,12 +109,9 @@ struct UserProfilePage {
     if (this.layoutMode !== LayoutMode.SINGLE) {
       this.selectedRepo = repo;
     } else {
-      router.pushUrl({
-        url: 'pages/RepoDetailPage',
-        params: {
-          owner: repo.owner?.login || this.username,
-          repo: repo.name
-        }
+      UIHelper.pushUrl(this, 'pages/RepoDetailPage', {
+        owner: repo.owner?.login || this.username,
+        repo: repo.name
       });
     }
   }
@@ -144,7 +141,7 @@ struct UserProfilePage {
       .height(40)
       .justifyContent(FlexAlign.Center)
       .onClick((): void => {
-        router.back();
+        UIHelper.goBack(this);
       })
 
       Text(this.username)
@@ -274,15 +271,9 @@ struct UserProfilePage {
     }
     .onClick((): void => {
       if (type === 'followers') {
-        router.pushUrl({
-          url: 'pages/FollowListPage',
-          params: { username: this.username, type: 'followers' }
-        });
+        UIHelper.pushUrl(this, 'pages/FollowListPage', { username: this.username, type: 'followers' });
       } else if (type === 'following') {
-        router.pushUrl({
-          url: 'pages/FollowListPage',
-          params: { username: this.username, type: 'following' }
-        });
+        UIHelper.pushUrl(this, 'pages/FollowListPage', { username: this.username, type: 'following' });
       }
     })
   }
@@ -556,12 +547,9 @@ struct UserProfilePage {
           fullWidth: true,
           colors: this.colors,
           onTap: (): void => {
-            router.pushUrl({
-              url: 'pages/RepoDetailPage',
-              params: {
-                owner: this.selectedRepo!.owner?.login || this.username,
-                repo: this.selectedRepo!.name
-              }
+            UIHelper.pushUrl(this, 'pages/RepoDetailPage', {
+              owner: this.selectedRepo!.owner?.login || this.username,
+              repo: this.selectedRepo!.name
             });
           }
         })

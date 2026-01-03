@@ -7,7 +7,6 @@
  * - 支持响应式布局和主题切换
  */
 
-import router from '@ohos.router';
 import { userState } from '../common/state/UserState';
 import { authManager } from '../services/AuthManager';
 import { GitHubNotification } from '../models/GitHubModels';
@@ -28,6 +27,7 @@ import {
   RFButton,
   RFSplitView,
 } from '../components';
+import { UIHelper } from '../common/ui';
 
 // =====================================================
 // 通知页面
@@ -50,8 +50,13 @@ export default struct NotificationsPage {
   @State deviceType: DeviceType = ResponsiveManager.state.deviceType;
 
   private t(res: Resource, ...args: Array<string | number>): string {
-    const rm = getContext(this).resourceManager;
-    return rm.getStringSync(res.id, ...args);
+    try {
+      const rm = this.getUIContext()!.getHostContext()!.resourceManager!;
+      return rm.getStringSync(res.id, ...args);
+    } catch (error) {
+      console.error('Resource loading failed:', error);
+      return '';
+    }
   }
 
   // =====================================================
@@ -125,12 +130,9 @@ export default struct NotificationsPage {
     if (this.layoutMode !== LayoutMode.SINGLE) {
       this.selectedNotification = notification;
     } else {
-      router.pushUrl({
-        url: 'pages/RepoDetailPage',
-        params: {
-          owner: notification.repository.owner.login,
-          repo: notification.repository.name
-        }
+      UIHelper.pushUrl(this, 'pages/RepoDetailPage', {
+        owner: notification.repository.owner.login,
+        repo: notification.repository.name
       });
     }
     if (notification.unread) {
@@ -396,12 +398,9 @@ export default struct NotificationsPage {
           fullWidth: true,
           colors: this.colors,
           onTap: (): void => {
-            router.pushUrl({
-              url: 'pages/RepoDetailPage',
-              params: {
-                owner: this.selectedNotification!.repository.owner.login,
-                repo: this.selectedNotification!.repository.name
-              }
+            UIHelper.pushUrl(this, 'pages/RepoDetailPage', {
+              owner: this.selectedNotification!.repository.owner.login,
+              repo: this.selectedNotification!.repository.name
             });
           }
         })

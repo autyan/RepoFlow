@@ -7,7 +7,6 @@
  * - 支持响应式布局和主题切换
  */
 
-import router from '@ohos.router';
 import { authManager } from '../services/AuthManager';
 import { GitHubIssue, GitHubLabel } from '../models/GitHubModels';
 import {
@@ -26,6 +25,7 @@ import {
   RFButton,
   RFSplitView,
 } from '../components';
+import { UIHelper } from '../common/ui';
 
 interface RouteParams {
   owner: string;
@@ -76,7 +76,7 @@ struct IssuesPage {
       this.deviceType = state.deviceType;
     });
 
-    const params = router.getParams() as RouteParams | undefined;
+    const params = this.getUIContext()!.getRouter()!.getParams() as RouteParams | undefined;
     if (params) {
       this.owner = params.owner;
       this.repoName = params.repo;
@@ -100,7 +100,11 @@ struct IssuesPage {
 
     const api = authManager.getGitHubApi();
     if (!api) {
-      this.error = getContext(this).resourceManager.getStringSync($r('app.string.please_login').id);
+      try {
+        this.error = this.getUIContext()!.getHostContext()!.resourceManager!.getStringSync($r('app.string.please_login').id);
+      } catch (e) {
+        this.error = 'Please login';
+      }
       this.isLoading = false;
       return;
     }
@@ -124,7 +128,11 @@ struct IssuesPage {
         this.currentPage++;
       }
     } catch (err) {
-      this.error = getContext(this).resourceManager.getStringSync($r('app.string.load_issues_failed').id);
+      try {
+        this.error = this.getUIContext()!.getHostContext()!.resourceManager!.getStringSync($r('app.string.load_issues_failed').id);
+      } catch (e) {
+        this.error = 'Load issues failed';
+      }
       console.error('Load issues failed:', JSON.stringify(err));
     } finally {
       this.isLoading = false;
@@ -136,13 +144,10 @@ struct IssuesPage {
     if (this.layoutMode !== LayoutMode.SINGLE) {
       this.selectedIssue = issue;
     } else {
-      router.pushUrl({
-        url: 'pages/IssueDetailPage',
-        params: {
-          owner: this.owner,
-          repo: this.repoName,
-          issueNumber: issue.number
-        }
+      UIHelper.pushUrl(this, 'pages/IssueDetailPage', {
+        owner: this.owner,
+        repo: this.repoName,
+        issueNumber: issue.number
       });
     }
   }
@@ -152,23 +157,28 @@ struct IssuesPage {
   // =====================================================
 
   formatDate(dateStr: string): string {
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    const rm = getContext(this).resourceManager;
+    try {
+      const date = new Date(dateStr);
+      const now = new Date();
+      const diff = now.getTime() - date.getTime();
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const rm = this.getUIContext()!.getHostContext()!.resourceManager!;
 
-    if (days === 0) {
-      const hours = Math.floor(diff / (1000 * 60 * 60));
-      if (hours === 0) {
-        const minutes = Math.floor(diff / (1000 * 60));
-        return rm.getStringSync($r('app.string.minutes_ago').id).replace('%d', minutes.toString());
+      if (days === 0) {
+        const hours = Math.floor(diff / (1000 * 60 * 60));
+        if (hours === 0) {
+          const minutes = Math.floor(diff / (1000 * 60));
+          return rm.getStringSync($r('app.string.minutes_ago').id).replace('%d', minutes.toString());
+        }
+        return rm.getStringSync($r('app.string.hours_ago').id).replace('%d', hours.toString());
+      } else if (days < 30) {
+        return rm.getStringSync($r('app.string.days_ago').id).replace('%d', days.toString());
+      } else {
+        return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
       }
-      return rm.getStringSync($r('app.string.hours_ago').id).replace('%d', hours.toString());
-    } else if (days < 30) {
-      return rm.getStringSync($r('app.string.days_ago').id).replace('%d', days.toString());
-    } else {
-      return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
+    } catch (error) {
+      console.error('Resource loading failed:', error);
+      return dateStr;
     }
   }
 
@@ -206,7 +216,7 @@ struct IssuesPage {
       .height(40)
       .justifyContent(FlexAlign.Center)
       .onClick((): void => {
-        router.back();
+        UIHelper.goBack(this);
       })
 
       Text($r('app.string.issues_tab_title'))
@@ -217,7 +227,7 @@ struct IssuesPage {
 
       // 新建 Issue 按钮
       Row() {
-        Text(getContext(this).resourceManager.getStringSync($r('app.string.plus_sign').id))
+        Text(UIHelper.getString(this, $r('app.string.plus_sign'), '+'))
           .fontSize(24)
           .fontColor(this.colors.brandPrimary)
       }
@@ -225,12 +235,9 @@ struct IssuesPage {
       .height(40)
       .justifyContent(FlexAlign.Center)
       .onClick((): void => {
-        router.pushUrl({
-          url: 'pages/CreateIssuePage',
-          params: {
-            owner: this.owner,
-            repo: this.repoName
-          }
+        UIHelper.pushUrl(this, 'pages/CreateIssuePage', {
+          owner: this.owner,
+          repo: this.repoName
         });
       })
     }
@@ -541,13 +548,10 @@ struct IssuesPage {
           fullWidth: true,
           colors: this.colors,
           onTap: (): void => {
-            router.pushUrl({
-              url: 'pages/IssueDetailPage',
-              params: {
-                owner: this.owner,
-                repo: this.repoName,
-                issueNumber: this.selectedIssue!.number
-              }
+            UIHelper.pushUrl(this, 'pages/IssueDetailPage', {
+              owner: this.owner,
+              repo: this.repoName,
+              issueNumber: this.selectedIssue!.number
             });
           }
         })

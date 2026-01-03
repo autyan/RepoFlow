@@ -8,9 +8,8 @@
  * - 支持响应式布局和主题切换
  */
 
-import router from '@ohos.router';
-import promptAction from '@ohos.promptAction';
 import pasteboard from '@ohos.pasteboard';
+import resmgr from '@ohos.resourceManager';
 import { authManager } from '../services/AuthManager';
 import { GitHubIssue, GitHubComment, GitHubLabel } from '../models/GitHubModels';
 import { Markdown, MarkdownController } from '@luvi/lv-markdown-in';
@@ -31,6 +30,7 @@ import {
   RFAvatar,
   RFSplitView,
 } from '../components';
+import { UIHelper } from '../common/ui';
 
 interface RouteParams {
   owner: string;
@@ -109,7 +109,7 @@ struct IssueDetailPage {
         this.copyToClipboard(code);
       });
 
-    const params = router.getParams() as RouteParams | undefined;
+    const params = this.getUIContext().getRouter().getParams() as RouteParams | undefined;
     if (params) {
       this.owner = params.owner;
       this.repoName = params.repo;
@@ -123,15 +123,14 @@ struct IssueDetailPage {
   // =====================================================
 
   async copyToClipboard(text: string): Promise<void> {
-    try {
-      const pasteboardData = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, text);
-      const systemPasteboard = pasteboard.getSystemPasteboard();
-      await systemPasteboard.setData(pasteboardData);
-      promptAction.showToast({ message: getContext(this).resourceManager.getStringSync($r('app.string.copied_to_clipboard').id) });
-    } catch (err) {
-      console.error('Copy failed:', JSON.stringify(err));
-      promptAction.showToast({ message: getContext(this).resourceManager.getStringSync($r('app.string.copy_failed').id) });
-    }
+    await UIHelper.copyToClipboard(
+      this,
+      text,
+      $r('app.string.copied_to_clipboard'),
+      'Copied',
+      $r('app.string.copy_failed'),
+      'Copy failed'
+    );
   }
 
   async loadIssue(): Promise<void> {
@@ -140,7 +139,11 @@ struct IssueDetailPage {
 
     const api = authManager.getGitHubApi();
     if (!api) {
-      this.error = getContext(this).resourceManager.getStringSync($r('app.string.please_login').id);
+      try {
+        this.error = this.getUIContext()!.getHostContext()!.resourceManager!.getStringSync($r('app.string.please_login').id);
+      } catch (error) {
+        this.error = 'Please login';
+      }
       this.isLoading = false;
       return;
     }
@@ -149,7 +152,11 @@ struct IssueDetailPage {
       this.issue = await api.getIssue(this.owner, this.repoName, this.issueNumber);
       this.loadComments();
     } catch (err) {
-      this.error = getContext(this).resourceManager.getStringSync($r('app.string.load_issue_failed').id);
+      try {
+        this.error = this.getUIContext()!.getHostContext()!.resourceManager!.getStringSync($r('app.string.load_issue_failed').id);
+      } catch (error) {
+        this.error = 'Load issue failed';
+      }
       console.error('Load issue failed:', JSON.stringify(err));
     } finally {
       this.isLoading = false;
@@ -173,16 +180,15 @@ struct IssueDetailPage {
   }
 
   async submitComment(): Promise<void> {
-    const rm = getContext(this).resourceManager;
     if (!this.commentText.trim()) {
-      promptAction.showToast({ message: rm.getStringSync($r('app.string.enter_comment_content').id) });
+      UIHelper.showToast(this, $r('app.string.enter_comment_content'), 'Enter comment content');
       return;
     }
 
     this.isSubmitting = true;
     const api = authManager.getGitHubApi();
     if (!api) {
-      promptAction.showToast({ message: rm.getStringSync($r('app.string.please_login').id) });
+      UIHelper.showToast(this, $r('app.string.please_login'), 'Please login');
       this.isSubmitting = false;
       return;
     }
@@ -192,9 +198,9 @@ struct IssueDetailPage {
       this.comments.push(newComment);
       this.commentText = '';
       this.showCommentInput = false;
-      promptAction.showToast({ message: rm.getStringSync($r('app.string.comment_success').id) });
+      UIHelper.showToast(this, $r('app.string.comment_success'), 'Comment success');
     } catch (err) {
-      promptAction.showToast({ message: rm.getStringSync($r('app.string.comment_failed').id) });
+      UIHelper.showToast(this, $r('app.string.comment_failed'), 'Comment failed');
       console.error('Submit comment failed:', JSON.stringify(err));
     } finally {
       this.isSubmitting = false;
@@ -206,23 +212,28 @@ struct IssueDetailPage {
   // =====================================================
 
   formatDate(dateStr: string): string {
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    const rm = getContext(this).resourceManager;
+    try {
+      const date = new Date(dateStr);
+      const now = new Date();
+      const diff = now.getTime() - date.getTime();
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const rm = this.getUIContext()!.getHostContext()!.resourceManager!;
 
-    if (days === 0) {
-      const hours = Math.floor(diff / (1000 * 60 * 60));
-      if (hours === 0) {
-        const minutes = Math.floor(diff / (1000 * 60));
-        return rm.getStringSync($r('app.string.minutes_ago').id).replace('%d', minutes.toString());
+      if (days === 0) {
+        const hours = Math.floor(diff / (1000 * 60 * 60));
+        if (hours === 0) {
+          const minutes = Math.floor(diff / (1000 * 60));
+          return rm.getStringSync($r('app.string.minutes_ago').id).replace('%d', minutes.toString());
+        }
+        return rm.getStringSync($r('app.string.hours_ago').id).replace('%d', hours.toString());
+      } else if (days < 30) {
+        return rm.getStringSync($r('app.string.days_ago').id).replace('%d', days.toString());
+      } else {
+        return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
       }
-      return rm.getStringSync($r('app.string.hours_ago').id).replace('%d', hours.toString());
-    } else if (days < 30) {
-      return rm.getStringSync($r('app.string.days_ago').id).replace('%d', days.toString());
-    } else {
-      return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
+    } catch (error) {
+      console.error('Resource loading failed:', error);
+      return dateStr;
     }
   }
 
@@ -260,10 +271,14 @@ struct IssueDetailPage {
       .height(40)
       .justifyContent(FlexAlign.Center)
       .onClick((): void => {
-        router.back();
+        try {
+          this.getUIContext()!.getRouter()!.back();
+        } catch (error) {
+          console.error('Navigation failed:', error);
+        }
       })
 
-      Text(getContext(this).resourceManager.getStringSync($r('app.string.issue_title_with_number').id, this.issueNumber))
+      Text(UIHelper.getString(this, $r('app.string.issue_title_with_number', this.issueNumber), `Issue #${this.issueNumber}`))
         .fontSize(FontSize.XL)
         .fontWeight(FontWeight.Medium)
         .fontColor(this.colors.textPrimary)
@@ -352,9 +367,7 @@ struct IssueDetailPage {
             colors: this.colors
           })
 
-          Text(getContext(this).resourceManager.getStringSync($r('app.string.created_by').id)
-            .replace('%s', this.issue.user.login)
-            .replace('%s', this.formatDate(this.issue.created_at)))
+          Text(`Created by ${this.issue.user.login} on ${this.formatDate(this.issue.created_at)}`)
             .fontSize(FontSize.SM)
             .fontColor(this.colors.textSecondary)
         }
@@ -400,8 +413,7 @@ struct IssueDetailPage {
   CommentsSection() {
     if (this.issue && (this.comments.length > 0 || this.isLoadingComments)) {
       Column({ space: Spacing.MD }) {
-        Text(getContext(this).resourceManager.getStringSync($r('app.string.comments_count').id)
-          .replace('%d', this.issue.comments.toString()))
+        Text(`${this.issue.comments} comments`)
           .fontSize(FontSize.LG)
           .fontWeight(FontWeight.Medium)
           .fontColor(this.colors.textPrimary)

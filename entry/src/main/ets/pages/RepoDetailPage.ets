@@ -8,11 +8,10 @@
  * - 支持响应式布局和主题切换
  */
 
-import router from '@ohos.router';
 import pasteboard from '@ohos.pasteboard';
-import promptAction from '@ohos.promptAction';
 import { authManager } from '../services/AuthManager';
 import { GitHubRepo } from '../models/GitHubModels';
+import { UIHelper } from '../common/ui';
 import { Markdown, MarkdownController } from '@luvi/lv-markdown-in';
 import {
   ThemeManager,
@@ -105,10 +104,10 @@ struct RepoDetailPage {
       .setTableBackgroundColor(this.colors.bgPrimary)
       .setTableTitleBackgroundColor(this.colors.bgTertiary)
       .setCodeCopyListener((code: string): void => {
-        this.copyToClipboard(code);
+        UIHelper.copyToClipboard(this, code, $r('app.string.copied_to_clipboard'), 'Copied', $r('app.string.copy_failed'), 'Copy failed');
       });
 
-    const params = router.getParams() as RouteParams | undefined;
+    const params = this.getUIContext().getRouter().getParams() as RouteParams | undefined;
     if (params) {
       this.owner = params.owner;
       this.repoName = params.repo;
@@ -120,22 +119,10 @@ struct RepoDetailPage {
   // 数据加载
   // =====================================================
 
-  async copyToClipboard(text: string): Promise<void> {
-    try {
-      const pasteboardData = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, text);
-      const systemPasteboard = pasteboard.getSystemPasteboard();
-      await systemPasteboard.setData(pasteboardData);
-      promptAction.showToast({ message: getContext(this).resourceManager.getStringSync($r('app.string.copied_to_clipboard').id) });
-    } catch (err) {
-      promptAction.showToast({ message: getContext(this).resourceManager.getStringSync($r('app.string.copy_failed').id) });
-      console.error('Copy failed:', JSON.stringify(err));
-    }
-  }
-
   async loadRepoDetail(): Promise<void> {
     const api = authManager.getGitHubApi();
     if (!api) {
-      this.error = getContext(this).resourceManager.getStringSync($r('app.string.please_login').id);
+      this.error = UIHelper.getString(this, $r('app.string.please_login'), 'Please login');
       this.isLoading = false;
       return;
     }
@@ -144,7 +131,7 @@ struct RepoDetailPage {
       this.repo = await api.getRepo(this.owner, this.repoName);
       this.loadReadme();
     } catch (err) {
-      this.error = getContext(this).resourceManager.getStringSync($r('app.string.load_repo_failed').id);
+      this.error = UIHelper.getString(this, $r('app.string.load_repo_failed'), 'Load repo failed');
       console.error('Load repo failed:', JSON.stringify(err));
     } finally {
       this.isLoading = false;
@@ -202,10 +189,10 @@ struct RepoDetailPage {
       .height(40)
       .justifyContent(FlexAlign.Center)
       .onClick((): void => {
-        router.back();
+        UIHelper.goBack(this);
       })
 
-      Text(this.repoName || getContext(this).resourceManager.getStringSync($r('app.string.repo_details').id))
+      Text(this.repoName || UIHelper.getString(this, $r('app.string.repo_details'), 'Repository Details'))
         .fontSize(FontSize.XL)
         .fontWeight(FontWeight.Medium)
         .fontColor(this.colors.textPrimary)
@@ -335,8 +322,7 @@ struct RepoDetailPage {
                 .fontColor(this.colors.textSecondary)
             }
           }
-          Text(getContext(this).resourceManager.getStringSync($r('app.string.updated_at').id)
-            .replace('%s', this.formatDate(this.repo.updated_at)))
+          Text(UIHelper.getString(this, $r('app.string.updated_at'), 'Updated: %s').replace('%s', this.formatDate(this.repo.updated_at)))
             .fontSize(FontSize.SM)
             .fontColor(this.colors.textSecondary)
         }
@@ -354,17 +340,11 @@ struct RepoDetailPage {
   QuickActions() {
     Column({ space: Spacing.SM }) {
       this.ActionRow($r('app.media.ic_code'), $r('app.string.browse_code'), $r('app.string.browse_repo_files'), (): void => {
-        router.pushUrl({
-          url: 'pages/CodeBrowserPage',
-          params: { owner: this.owner, repo: this.repoName }
-        });
+        UIHelper.pushUrl(this, 'pages/CodeBrowserPage', { owner: this.owner, repo: this.repoName });
       })
 
       this.ActionRow($r('app.media.ic_issue_open'), $r('app.string.issues'), `${this.repo?.open_issues_count ?? 0}`, (): void => {
-        router.pushUrl({
-          url: 'pages/IssuesPage',
-          params: { owner: this.owner, repo: this.repoName }
-        });
+        UIHelper.pushUrl(this, 'pages/IssuesPage', { owner: this.owner, repo: this.repoName });
       })
 
       this.ActionRow($r('app.media.ic_pr'), $r('app.string.pull_requests'), $r('app.string.view_pull_requests'), (): void => {})
@@ -454,7 +434,7 @@ struct RepoDetailPage {
         buttonSize: 'md',
         colors: this.colors,
         onTap: (): void => {
-          router.back();
+          UIHelper.goBack(this);
         }
       })
         .margin({ top: Spacing.LG })

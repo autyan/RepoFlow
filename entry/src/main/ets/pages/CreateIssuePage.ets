@@ -7,8 +7,6 @@
  * - 支持响应式布局和主题切换
  */
 
-import router from '@ohos.router';
-import promptAction from '@ohos.promptAction';
 import { authManager } from '../services/AuthManager';
 import {
   ThemeManager,
@@ -25,6 +23,7 @@ import {
   RFCard,
   RFButton,
 } from '../components';
+import { UIHelper } from '../common/ui';
 
 interface RouteParams {
   owner: string;
@@ -70,7 +69,7 @@ struct CreateIssuePage {
       this.deviceType = state.deviceType;
     });
 
-    const params = router.getParams() as RouteParams | undefined;
+    const params = this.getUIContext()!.getRouter()!.getParams() as RouteParams | undefined;
     if (params) {
       this.owner = params.owner;
       this.repoName = params.repo;
@@ -83,24 +82,24 @@ struct CreateIssuePage {
 
   async submitIssue(): Promise<void> {
     if (!this.title.trim()) {
-      promptAction.showToast({ message: getContext(this).resourceManager.getStringSync($r('app.string.please_input_title').id) });
+      UIHelper.showToast(this, $r('app.string.please_input_title'), 'Please input title');
       return;
     }
 
     this.isSubmitting = true;
     const api = authManager.getGitHubApi();
     if (!api) {
-      promptAction.showToast({ message: getContext(this).resourceManager.getStringSync($r('app.string.please_login').id) });
+      UIHelper.showToast(this, $r('app.string.please_login'), 'Please login');
       this.isSubmitting = false;
       return;
     }
 
     try {
       const issue = await api.createIssue(this.owner, this.repoName, this.title.trim(), this.body.trim() || undefined);
-      promptAction.showToast({ message: getContext(this).resourceManager.getStringSync($r('app.string.issue_created').id) });
-      router.back();
+      UIHelper.showToast(this, $r('app.string.issue_created'), 'Issue created');
+      UIHelper.goBack(this);
     } catch (err) {
-      promptAction.showToast({ message: getContext(this).resourceManager.getStringSync($r('app.string.create_failed').id) });
+      UIHelper.showToast(this, $r('app.string.create_failed'), 'Create failed');
       console.error('Create issue failed:', JSON.stringify(err));
     } finally {
       this.isSubmitting = false;
@@ -125,7 +124,7 @@ struct CreateIssuePage {
       .height(40)
       .justifyContent(FlexAlign.Center)
       .onClick((): void => {
-        router.back();
+        UIHelper.goBack(this);
       })
 
       Text($r('app.string.new_issue'))

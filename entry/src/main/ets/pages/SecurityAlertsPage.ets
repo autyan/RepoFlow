@@ -3,7 +3,6 @@
  * 显示用户所有仓库的安全警报
  */
 
-import router from '@ohos.router';
 import { authManager } from '../services/AuthManager';
 import { GitHubSecurityAlert } from '../models/GitHubModels';
 import {
@@ -14,6 +13,7 @@ import {
   FontSize,
 } from '../theme';
 import { RFCard } from '../components';
+import { UIHelper } from '../common/ui';
 
 @Entry
 @Component
@@ -27,8 +27,13 @@ struct SecurityAlertsPage {
   @State selectedFilter: string = 'all'; // all, critical, high, medium, low
 
   private t(res: Resource, ...args: Array<string | number>): string {
-    const rm = getContext(this).resourceManager;
-    return rm.getStringSync(res.id, ...args);
+    try {
+      const rm = this.getUIContext()!.getHostContext()!.resourceManager!;
+      return rm.getStringSync(res.id, ...args);
+    } catch (error) {
+      console.error('Resource loading failed:', error);
+      return '';
+    }
   }
 
   aboutToAppear(): void {
@@ -205,13 +210,10 @@ struct SecurityAlertsPage {
     .backgroundColor(this.colors.bgSecondary)
     .borderRadius(BorderRadius.MD)
     .onClick(() => {
-      router.pushUrl({
-        url: 'pages/SecurityAlertDetailPage',
-        params: {
-          alert: alert,
-          owner: alert.repository?.owner?.login || '',
-          repo: alert.repository?.name || ''
-        }
+      UIHelper.pushUrl(this, 'pages/SecurityAlertDetailPage', {
+        alert: alert,
+        owner: alert.repository?.owner?.login || '',
+        repo: alert.repository?.name || ''
       });
     })
   }
@@ -225,7 +227,7 @@ struct SecurityAlertsPage {
           .height(24)
           .fillColor(this.colors.textPrimary)
           .onClick(() => {
-            router.back();
+            UIHelper.goBack(this);
           })
 
         Text($r('app.string.security_alerts'))

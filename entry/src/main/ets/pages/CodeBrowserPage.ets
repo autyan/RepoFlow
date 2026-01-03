@@ -8,7 +8,6 @@
  * - 响应式布局
  */
 
-import router from '@ohos.router';
 import { util } from '@kit.ArkTS';
 import { authManager } from '../services/AuthManager';
 import { GitHubBranch } from '../models/GitHubModels';
@@ -31,6 +30,7 @@ import {
   FileNodeType,
   getFileExtension,
 } from '../components';
+import { UIHelper } from '../common/ui';
 
 // =====================================================
 // 路由参数
@@ -68,8 +68,13 @@ struct CodeBrowserPage {
   private repoName: string = '';
 
   private t(res: Resource, ...args: Array<string | number>): string {
-    const rm = getContext(this).resourceManager;
-    return rm.getStringSync(res.id, ...args);
+    try {
+      const rm = this.getUIContext()!.getHostContext()!.resourceManager!;
+      return rm.getStringSync(res.id, ...args);
+    } catch (error) {
+      console.error('Resource loading failed:', error);
+      return '';
+    }
   }
 
   // =====================================================
@@ -78,7 +83,7 @@ struct CodeBrowserPage {
 
   aboutToAppear(): void {
     // 获取路由参数
-    const params = router.getParams() as RouteParams | undefined;
+    const params = this.getUIContext()!.getRouter()!.getParams() as RouteParams | undefined;
     if (params) {
       this.owner = params.owner;
       this.repoName = params.repo;
@@ -211,14 +216,10 @@ struct CodeBrowserPage {
   switchBranch(branch: string): void {
     if (branch !== this.currentBranch) {
       this.currentBranch = branch;
-      // 重新加载页面以刷新内容
-      router.replaceUrl({
-        url: 'pages/CodeBrowserPage',
-        params: {
-          owner: this.owner,
-          repo: this.repoName,
-          branch: branch
-        }
+      UIHelper.replaceUrl(this, 'pages/CodeBrowserPage', {
+        owner: this.owner,
+        repo: this.repoName,
+        branch: branch
       });
     }
     this.showBranchPicker = false;
@@ -226,7 +227,7 @@ struct CodeBrowserPage {
 
   // 返回导航
   navigateBack(): void {
-    router.back();
+    UIHelper.goBack(this);
   }
 
   // =====================================================
